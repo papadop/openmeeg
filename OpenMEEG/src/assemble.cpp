@@ -84,40 +84,21 @@ int main(int argc, char** argv)
     C.start();
 
     /*********************************************************************************************
-    * Computation of Calderon Matrix H = [ -D  S ] linking two interfaces (indexed i and j) 
-                                         [ -N  D*]
+    * Computation of Head Matrix for BEM Symmetric formulation
     **********************************************************************************************/
-    if ( ( !strcmp(argv[1], "-CalderonMat") ) | ( !strcmp(argv[1], "-CM" ) ) | ( !strcmp(argv[1], "-cm") ) ) {
+    if ( ( !strcmp(argv[1], "-HeadMat") ) | ( !strcmp(argv[1], "-HM" ) ) | ( !strcmp(argv[1], "-hm") ) ) {
         if ( argc < 3 ) {
             std::cerr << "Please set geometry filepath !" << endl;
             exit(1);
         }
-        if ( argc < 5 ) {
-            std::cerr << "Please set interface indices !" << endl;
+        if ( argc < 4 ) {
+            std::cerr << "Please set conductivities filepath !" << endl;
             exit(1);
         }
-        if ( argc < 6 ) {
+        if ( argc < 5 ) {
             std::cerr << "Please set output filepath !" << endl;
             exit(1);
         }
-        // Loading surfaces from geometry file
-        Geometry geo;
-        geo.read(argv[2]);
-
-        // Check for intersecting meshes
-        if ( !geo.selfCheck() ) {
-            exit(1);
-        }
-
-        // Assembling Matrix from discretization :
-	CalderonMat CM(geo, argv[3], argv[4], gauss_order);
-	        CM.save(argv[5]);
-    }
-    /*********************************************************************************************
-    * Computation of Head Matrix for BEM Symmetric formulation
-    **********************************************************************************************/
-    if ( option(argc, argv, {"-HeadMat","-HM", "-hm"},
-                {"geometry file", "conductivity file", "output file"}) ) {
         // Loading surfaces from geometry file
         Geometry geo;
         geo.read(argv[2], argv[3], OLD_ORDERING);
@@ -132,6 +113,26 @@ int main(int argc, char** argv)
         HM.save(argv[4]);
     }
 
+   /*********************************************************************************************
+    * Computation of Calderon Matrix H = [ -D  S ] linking two interfaces (indexed i and j) 
+                                         [ -N  D*]
+    **********************************************************************************************/
+    if ( option(argc, argv, {"-CalderonMat","-CalM", "-calm"},
+                {"geometry file", "interface1", "interface2", "output file"}) ) {
+        // Loading surfaces from geometry file
+        Geometry geo;
+        geo.read(argv[2]);
+
+        // Check for intersecting meshes
+        if ( !geo.selfCheck() ) {
+            exit(1);
+        }
+
+        // Assembling Matrix from discretization :
+	CalderonMat CM(geo, argv[3], argv[4], gauss_order);
+	CM.save(argv[5]);
+    }
+    
     /*********************************************************************************************
     * Computation of Cortical Matrix for BEM Symmetric formulation
     **********************************************************************************************/
