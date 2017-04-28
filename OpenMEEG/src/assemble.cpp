@@ -114,7 +114,7 @@ int main(int argc, char** argv)
     }
 
    /*********************************************************************************************
-    * Computation of Calderon Matrix H = [ -D  S ] linking two interfaces (indexed i and j) 
+    * Computation of Calderon Matrix H = [ -D  S ] linking two interfaces (indexed i and j)
                                          [ -N  D*]
     **********************************************************************************************/
     if ( option(argc, argv, {"-CalderonMat","-CalM", "-calm"},
@@ -132,7 +132,7 @@ int main(int argc, char** argv)
 	CalderonMat CM(geo, argv[3], argv[4], gauss_order);
 	CM.save(argv[5]);
     }
-    
+
     /*********************************************************************************************
     * Computation of Cortical Matrix for BEM Symmetric formulation
     **********************************************************************************************/

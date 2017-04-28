@@ -105,65 +105,65 @@ namespace OpenMEEG {
     }
 
 	void assemble_CM(const Geometry& geo, Matrix& mat, const std::string interface1, const std::string interface2, const unsigned gauss_order)
-	{
-	  // assembling Calderon matrix [-D S ] 
-	  //                            [-N D*]
-	  const Mesh& mesh1=geo.mesh(interface1);
-	  const Mesh& mesh2=geo.mesh(interface2);
-	  mesh1.info();
-	  mesh2.info();
-	  mat = Matrix(mesh1.nb_vertices()+mesh1.nb_triangles(),mesh2.nb_vertices()+mesh2.nb_triangles());
-	  mat.set(0.0);
-	  Matrix tmp_mat;
-	  tmp_mat = Matrix(geo.size());
-	  tmp_mat.set(0.0);
-	  double K = 1.0 / (4.0 * M_PI);
-	  // check that interface1 and interface2 communicate, i.e they are used for the definition of a common domain
-	  const int orientation = geo.oriented(mesh1,mesh2); // equals  0, if they don't have any domains in common
-	  std::cerr << "orientation = " << orientation << std::endl;
-	  // equals  1, if they are both oriented toward the same domain
-	  // equals -1, if they are not
-	  if(orientation!=0){
-	    double Scoeff =   orientation * K;
-	    double Dcoeff = - orientation * geo.indicator(mesh1, mesh2) * K;
-	    double Ncoeff =   1.0;
-	    // Computing S block first because it's needed for the corresponding N block
-	    operatorS(mesh1, mesh2, tmp_mat, Scoeff, gauss_order); 
-	    // Computing D block
-	    operatorD(mesh1, mesh2, tmp_mat, Dcoeff, gauss_order, false);
-	    // Computing D* block
-	    operatorD(mesh1, mesh2, tmp_mat, Dcoeff, gauss_order, true);
-	    // Computing N block
-	    operatorN(mesh1, mesh2, tmp_mat, Ncoeff, gauss_order);
-	  
-	  int i=0;
-	  for ( Mesh::const_iterator tit1=mesh1.begin(); tit1 != mesh1.end(); ++tit1) {
-	    int j=0;
-	    for ( Mesh::const_iterator tit2=mesh2.begin(); tit2 != mesh2.end(); ++tit2) {
-	      mat(i,j) = tmp_mat(tit1->index(),tit2->index());
-	      j++;
-	    }
-	    for ( Mesh::const_vertex_iterator vit2=mesh2.vertex_begin(); vit2 < mesh2.vertex_end(); ++vit2){
-	      mat(i,j) = tmp_mat(tit1->index(),(*vit2)->index());
-	      j++;
-	    }
-	    i++;
-	  }
-	  for ( Mesh::const_vertex_iterator vit1=mesh1.vertex_begin(); vit1 < mesh1.vertex_end(); ++vit1){
-	     int j=0;
-	    for ( Mesh::const_iterator tit2=mesh2.begin(); tit2 != mesh2.end(); ++tit2) {
-	      mat(i,j) = tmp_mat((*vit1)->index(),tit2->index());
-	      j++;
-	    }
-	    for ( Mesh::const_vertex_iterator vit2=mesh2.vertex_begin(); vit2 < mesh2.vertex_end(); ++vit2){
-	      mat(i,j) = tmp_mat((*vit1)->index(),(*vit2)->index());
-	      j++;
-	    }
-	    i++;
-	  }
-	  }
-	}
-	
+    {
+        // assembling Calderon matrix [-D S ]
+        //                            [-N D*]
+        const Mesh& mesh1=geo.mesh(interface1);
+        const Mesh& mesh2=geo.mesh(interface2);
+        mesh1.info();
+        mesh2.info();
+        mat = Matrix(mesh1.nb_vertices()+mesh1.nb_triangles(),mesh2.nb_vertices()+mesh2.nb_triangles());
+        mat.set(0.0);
+        Matrix tmp_mat;
+        tmp_mat = Matrix(geo.size());
+        tmp_mat.set(0.0);
+        double K = 1.0 / (4.0 * M_PI);
+        // check that interface1 and interface2 communicate, i.e they are used for the definition of a common domain
+        const int orientation = geo.oriented(mesh1,mesh2); // equals  0, if they don't have any domains in common
+        std::cerr << "orientation = " << orientation << std::endl;
+        // equals  1, if they are both oriented toward the same domain
+        // equals -1, if they are not
+        if(orientation!=0){
+            double Scoeff =   orientation * K;
+            double Dcoeff = - orientation * geo.indicator(mesh1, mesh2) * K;
+            double Ncoeff =   1.0;
+            // Computing S block first because it's needed for the corresponding N block
+            operatorS(mesh1, mesh2, tmp_mat, Scoeff, gauss_order);
+            // Computing D block
+            operatorD(mesh1, mesh2, tmp_mat, Dcoeff, gauss_order, false);
+            // Computing D* block
+            operatorD(mesh1, mesh2, tmp_mat, Dcoeff, gauss_order, true);
+            // Computing N block
+            operatorN(mesh1, mesh2, tmp_mat, Ncoeff, gauss_order);
+
+            int i=0;
+            for ( Mesh::const_iterator tit1=mesh1.begin(); tit1 != mesh1.end(); ++tit1) {
+                int j=0;
+                for ( Mesh::const_iterator tit2=mesh2.begin(); tit2 != mesh2.end(); ++tit2) {
+                    mat(i,j) = tmp_mat(tit1->index(),tit2->index());
+                    j++;
+                }
+                for ( Mesh::const_vertex_iterator vit2=mesh2.vertex_begin(); vit2 < mesh2.vertex_end(); ++vit2){
+                    mat(i,j) = tmp_mat(tit1->index(),(*vit2)->index());
+                    j++;
+                }
+                i++;
+            }
+            for ( Mesh::const_vertex_iterator vit1=mesh1.vertex_begin(); vit1 < mesh1.vertex_end(); ++vit1){
+                int j=0;
+                for ( Mesh::const_iterator tit2=mesh2.begin(); tit2 != mesh2.end(); ++tit2) {
+                    mat(i,j) = tmp_mat((*vit1)->index(),tit2->index());
+                    j++;
+                }
+                for ( Mesh::const_vertex_iterator vit2=mesh2.vertex_begin(); vit2 < mesh2.vertex_end(); ++vit2){
+                    mat(i,j) = tmp_mat((*vit1)->index(),(*vit2)->index());
+                    j++;
+                }
+                i++;
+            }
+        }
+    }
+
     void assemble_HM(const Geometry& geo, SymMatrix& mat, const unsigned gauss_order) 
     {
         mat = SymMatrix((geo.size()-geo.nb_current_barrier_triangles()));

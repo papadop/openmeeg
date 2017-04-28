@@ -158,7 +158,7 @@ namespace OpenMEEG {
         // This function has the following arguments:
         //    the 2 interacting meshes
         //    the storage Matrix for the result
-        //    the coefficient to be appleid to each matrix element (depending on conductivities, ...)
+        //    the coefficient to be applied to each matrix element (depending on conductivities, ...)
         //    the gauss order parameter (for adaptive integration)
 
         std::cout << "OPERATOR N ... (arg : mesh " << m1.name() << " , mesh " << m2.name() << " )" << std::endl;
