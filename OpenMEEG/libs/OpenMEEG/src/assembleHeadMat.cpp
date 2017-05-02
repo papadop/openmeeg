@@ -108,11 +108,11 @@ namespace OpenMEEG {
     {
         // assembling Calderon matrix [-D S ]
         //                            [-N D*]
-        const Mesh& mesh1=geo.mesh(interface1);
-        const Mesh& mesh2=geo.mesh(interface2);
+        const Mesh& mesh1 = geo.mesh(interface1);
+        const Mesh& mesh2 = geo.mesh(interface2);
         mesh1.info();
         mesh2.info();
-        mat = Matrix(mesh1.nb_vertices()+mesh1.nb_triangles(),mesh2.nb_vertices()+mesh2.nb_triangles());
+        mat = Matrix(mesh1.nb_vertices() + mesh1.nb_triangles(), mesh2.nb_vertices() + mesh2.nb_triangles());
         mat.set(0.0);
         Matrix tmp_mat;
         tmp_mat = Matrix(geo.size());
@@ -171,32 +171,32 @@ namespace OpenMEEG {
         double K = 1.0 / (4.0 * M_PI);
 
         // We iterate over the meshes (or pair of domains) to fill the lower half of the HeadMat (because of its symmetry)
-        for(Geometry::const_iterator mit1 = geo.begin(); mit1 != geo.end(); ++mit1) {
-            if(!mit1->isolated()){
-                for(Geometry::const_iterator mit2 = geo.begin(); (mit2 != (mit1+1)); ++mit2) {
-                    if((!mit2->isolated()) && (geo.sigma(*mit1,*mit2)!=0.0)){
+        for (Geometry::const_iterator mit1 = geo.begin(); mit1 != geo.end(); ++mit1) {
+            if (!mit1->isolated()) {
+                for (Geometry::const_iterator mit2 = geo.begin(); (mit2 != (mit1+1)); ++mit2) {
+                    if ((!mit2->isolated()) && (geo.sigma(*mit1,*mit2) != 0.0)) {
                         // if mit1 and mit2 communicate, i.e they are used for the definition of a common domain
                         const int orientation = geo.oriented(*mit1, *mit2); // equals  0, if they don't have any domains in common
                                                                             // equals  1, if they are both oriented toward the same domain
                                                                             // equals -1, if they are not
-                        if(orientation!=0){
+                        if (orientation != 0) {
                             double Scoeff =   orientation * geo.sigma_inv(*mit1, *mit2) * K;
                             double Dcoeff = - orientation * geo.indicator(*mit1, *mit2) * K;
                             double Ncoeff;
 
-                            if( (!mit1->current_barrier()) && (!mit2->current_barrier()) ) {
+                            if ( (!mit1->current_barrier()) && (!mit2->current_barrier()) ) {
                                 // Computing S block first because it's needed for the corresponding N block
                                 operatorS(*mit1, *mit2, mat, Scoeff, gauss_order);
                                 Ncoeff = geo.sigma(*mit1, *mit2)/geo.sigma_inv(*mit1, *mit2);
-                            }else{
+                            } else {
                                 Ncoeff = orientation * geo.sigma(*mit1, *mit2) * K;
                             }
 
-                            if(!mit1->current_barrier()){
+                            if (!mit1->current_barrier()) {
                                 // Computing D block
-                                operatorD(*mit1, *mit2, mat, Dcoeff, gauss_order,false);
+                                operatorD(*mit1, *mit2, mat, Dcoeff, gauss_order, false);
                             }
-                            if((*mit1!=*mit2) && (!mit2->current_barrier())){
+                            if ((*mit1!=*mit2) && (!mit2->current_barrier())) {
                                 // Computing D* block
                                 operatorD(*mit1, *mit2, mat, Dcoeff, gauss_order, true);
                             }
