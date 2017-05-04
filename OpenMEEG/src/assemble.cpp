@@ -112,12 +112,22 @@ int main(int argc, char** argv)
         HeadMat HM(geo, gauss_order);
         HM.save(argv[4]);
     }
+    else if ( option(argc, argv, {"-CalderonId","-CalId", "-calid"},
+                {"mesh file"}) ) {
+        if ( argc < 3 ) {
+            std::cerr << "Please set geometry filepath !" << endl;
+            exit(1);
+        }
+        Mesh m(argv[2]);
+        m.generate_indices();
+        CalderonId(m, 3);
+    }
 
    /*********************************************************************************************
     * Computation of Calderon Matrix H = [ -D  S ] linking two interfaces (indexed i and j)
                                          [ -N  D*]
     **********************************************************************************************/
-    if ( option(argc, argv, {"-CalderonMat","-CalM", "-calm"},
+    else if ( option(argc, argv, {"-CalderonMat","-CalM", "-calm"},
                 {"geometry file", "interface1", "interface2", "output file"}) ) {
         // Loading surfaces from geometry file
         Geometry geo;
@@ -129,8 +139,8 @@ int main(int argc, char** argv)
         }
 
         // Assembling Matrix from discretization :
-	CalderonMat CM(geo, argv[3], argv[4], gauss_order);
-	CM.save(argv[5]);
+        CalderonMat CM(geo, argv[3], argv[4], gauss_order);
+        CM.save(argv[5]);
     }
 
     /*********************************************************************************************

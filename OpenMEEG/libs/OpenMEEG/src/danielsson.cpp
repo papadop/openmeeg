@@ -117,6 +117,24 @@ namespace OpenMEEG
         return ( s > 0 ) ? 1 : ( s < 0 ) ? -1: 0;
     }
 
+    double dist_point_mesh(const Vect3& p, const Mesh& m, Vect3& alphas, Triangle& nearestTriangle)
+    {
+        double distmin = std::numeric_limits<double>::max();
+        bool inside;
+        double distance;
+        Vect3 alphasLoop;
+
+        for ( Mesh::const_iterator tit = m.begin(); tit !=  m.end(); ++tit) {
+            distance = dist_point_triangle(p, *tit, alphasLoop, inside);
+            if ( distance < distmin ) {
+                distmin = distance;
+                alphas = alphasLoop;
+                nearestTriangle = *tit;
+            }
+        }
+        return distmin;
+    }
+
     double dist_point_interface(const Vect3& p, const Interface& i, Vect3& alphas, Triangle& nearestTriangle) 
     {
         double distmin = std::numeric_limits<double>::max();
@@ -125,13 +143,12 @@ namespace OpenMEEG
         Vect3 alphasLoop;
 
         for ( Interface::const_iterator omit = i.begin(); omit != i.end(); ++omit ) {
-            for ( Mesh::const_iterator tit = omit->mesh().begin(); tit !=  omit->mesh().end(); ++tit) {
-                distance = dist_point_triangle(p, *tit, alphasLoop, inside);
-                if ( distance < distmin ) {
-                    distmin = distance;
-                    alphas = alphasLoop;
-                    nearestTriangle = *tit;
-                }
+            Triangle aTriangle;
+            distance = dist_point_mesh(p, omit->mesh(), alphasLoop, aTriangle);
+            if ( distance < distmin ) {
+                distmin = distance;
+                alphas = alphasLoop;
+                nearestTriangle = aTriangle;
             }
         }
         return distmin;

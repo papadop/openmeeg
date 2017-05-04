@@ -104,6 +104,163 @@ namespace OpenMEEG {
         }
     }
 
+	void calderon_identities(const Mesh& mesh, const unsigned gauss_order)
+    {
+        // testing Calderon matrix identites:
+        //   S I N = (1/4-DD')I
+        //   N I'S = (1/4-D*D')I'
+        //   N D = D*N
+        //   D S = S D*
+        // const Mesh& mesh = geo.mesh(interface);
+        //Matrix mat(mesh.nb_triangles() + mesh.nb_vertices(), mesh.nb_triangles() + mesh.nb_vertices()); // (nT+nV)^2
+        SymMatrix mat(mesh.nb_triangles() + mesh.nb_vertices()); // (nT+nV)^2
+        mat.set(0.0);
+        double K = 1.0 / (4.0 * M_PI);
+        double Scoeff =   K;
+        double Dcoeff = - 2.* K;
+        double Ncoeff =   1.;
+        Dcoeff = K;
+        Scoeff = K;
+        // Computing S block first because it's needed for the corresponding N block
+        operatorS(mesh, mesh, mat, Scoeff, gauss_order);
+        // Computing D block
+        operatorD(mesh, mesh, mat, Dcoeff, gauss_order, false);
+        // Computing N block
+        operatorN(mesh, mesh, mat, Ncoeff, gauss_order);
+
+        Matrix S = mat.submat(mesh.nb_vertices(), mesh.nb_triangles(), mesh.nb_vertices(), mesh.nb_triangles());
+        Matrix N = mat.submat(0, mesh.nb_vertices(), 0, mesh.nb_vertices());
+        Matrix D = mat.submat(mesh.nb_vertices(), mesh.nb_triangles(), 0, mesh.nb_vertices());
+
+        Matrix zero;
+        std::cout << "-------- S = S'  ---------" << std::endl;
+        zero = S - S.transpose();
+        std::cout << "\n******Devrait etre 0 = " << zero.frobenius_norm() << "\n\n";
+        std::cout << "-------- N = N'  ---------" << std::endl;
+        zero = N - N.transpose();
+        std::cout << "\n******Devrait etre 0 = " << zero.frobenius_norm() << "\n\n";
+
+        mat.set(0.);
+        mat.save("mat0.mat");
+        operatorP1P0GOOD(mesh, mat, 1.);
+        mat.save("mat.mat");
+        Matrix I = mat.submat(mesh.nb_vertices(), mesh.nb_triangles(), 0, mesh.nb_vertices());
+        I.save("I.txt");
+        // I /= I.frobenius_norm();
+#if 0
+        std::cout << "S.info(); "<< std::endl;
+        S.info();
+        std::cout << "N.info(); "<< std::endl;
+        N.info();
+        std::cout << "D.info(); "<< std::endl;
+        D.info();
+        std::cout << "I.info(); "<< std::endl;
+        I.info();
+#endif
+
+        Matrix Id(mesh.nb_triangles(), mesh.nb_triangles());
+        Id.set(0.);
+
+#if 0
+        for ( int i = 0; i < mesh.nb_triangles(); ++i) {
+            Id(i, i) = .25;
+        }
+#else
+        Id = I*I.transpose();
+        Id /= 4.;
+        Id.save("Id1.mat");
+#endif
+        std::cout << "\n-------- S I N-(Id-DD*) I  ---------" << std::endl;
+        zero = (S*I*N-(Id-D*D.transpose())*I);
+        std::cout << "******Devrait etre 0 = " << zero.frobenius_norm() << "\n\n";
+        zero = (S*I*N+(Id-D*D.transpose())*I);
+        std::cout << "******Devrait etre 0 = " << zero.frobenius_norm() << "\n\n";
+        // zero.info();
+
+        Matrix Id2(mesh.nb_vertices(), mesh.nb_vertices());
+        Id2.set(0.);
+#if 0
+        for ( int i = 0; i < mesh.nb_vertices(); ++i) {
+            Id2(i, i) = .25;
+        }
+#else
+        Id2 = I.transpose()*I;
+        Id2 /= 4.;
+        Id2.save("Id2.mat");
+#endif
+        std::cout << "\n-------- N I' S + (Id2-D*D) I')  ---------" << std::endl;
+        zero = (N*I.transpose()*S + (Id2-D.transpose()*D)*I.transpose());
+        std::cout << "******Devrait etre aussi 0 = " << zero.frobenius_norm() << "\n\n";
+        zero = (N*I.transpose()*S - (Id2-D.transpose()*D)*I.transpose());
+        std::cout << "******Devrait etre aussi 0 = " << zero.frobenius_norm() << "\n\n";
+        // zero.info();
+
+        std::cout << "-----------------" << std::endl;
+
+        std::cout << "\n-------- S I N I' + (Id-D D*)  ---------" << std::endl;
+        zero = (S*I*N*I.transpose() -D*D.transpose());
+        zero.info();
+        zero.save("I11.mat");
+        std::cout << "******Devrait etre 0 = " << zero.frobenius_norm() << "\n\n";
+        zero = (S*I*N*I.transpose() + D*D.transpose());
+        std::cout << "******Devrait etre 0 = " << zero.frobenius_norm() << "\n\n";
+        zero.save("I12.mat");
+        zero.info();
+
+        std::cout << "\n-------- N I' S I + (Id2-D* D)  ---------" << std::endl;
+        zero = (N*I.transpose()*S*I -D.transpose()*D);
+        zero.info();
+        zero.save("I21.mat");
+        std::cout << "******Devrait etre aussi 0 = " << zero.frobenius_norm() << "\n\n";
+        zero = (N*I.transpose()*S*I +D.transpose()*D);
+        zero.save("I22.mat");
+        std::cout << "******Devrait etre aussi 0 = " << zero.frobenius_norm() << "\n\n";
+        zero.info();
+
+        std::cout << "\n-------- Evident par symetrie :  ---------" << std::endl;
+        std::cout << "-------- K = S I N + I * 0.25  ---------" << std::endl;
+        std::cout << "-------- N I' S + I'*0.25 - K* ?=? 0. ---------" << std::endl;
+        zero = (S*I*N + I*0.25);
+        zero = (N*I.transpose()*S + I.transpose()*0.25 - zero.transpose());
+        std::cout << "\n******Devrait etre aussi 0 = " << zero.frobenius_norm() << "\n\n";
+
+        std::cout << "\n-------- SD* = DS  -- S I D* = D I' S -------" << std::endl;
+        zero = S * I * D.transpose() - D*I.transpose()*S;
+        std::cout << "\n******Devrait etre 0 = " << zero.frobenius_norm() << "\n\n";
+
+        std::cout << "\n-------- ND  = D*N -- N I' D = D' I N -------" << std::endl;
+        zero = N * I.transpose()*D - D.transpose()*I*N ;
+        std::cout << "\n******Devrait etre 0 = " << zero.frobenius_norm() << "\n\n";
+
+        /*
+            int i=0;
+            for ( Mesh::const_iterator tit1=mesh1.begin(); tit1 != mesh1.end(); ++tit1) {
+                int j=0;
+                for ( Mesh::const_iterator tit2=mesh2.begin(); tit2 != mesh2.end(); ++tit2) {
+                    mat(i,j) = tmp_mat(tit1->index(),tit2->index());
+                    j++;
+                }
+                for ( Mesh::const_vertex_iterator vit2=mesh2.vertex_begin(); vit2 < mesh2.vertex_end(); ++vit2){
+                    mat(i,j) = tmp_mat(tit1->index(),(*vit2)->index());
+                    j++;
+                }
+                i++;
+            }
+            for ( Mesh::const_vertex_iterator vit1=mesh1.vertex_begin(); vit1 < mesh1.vertex_end(); ++vit1){
+                int j=0;
+                for ( Mesh::const_iterator tit2=mesh2.begin(); tit2 != mesh2.end(); ++tit2) {
+                    mat(i,j) = tmp_mat((*vit1)->index(),tit2->index());
+                    j++;
+                }
+                for ( Mesh::const_vertex_iterator vit2=mesh2.vertex_begin(); vit2 < mesh2.vertex_end(); ++vit2){
+                    mat(i,j) = tmp_mat((*vit1)->index(),(*vit2)->index());
+                    j++;
+                }
+                i++;
+            }
+        }*/
+    }
+
 	void assemble_CM(const Geometry& geo, Matrix& mat, const std::string interface1, const std::string interface2, const unsigned gauss_order)
     {
         // assembling Calderon matrix [-D S ]
@@ -517,6 +674,10 @@ namespace OpenMEEG {
         }
     }
 
+    CalderonId::CalderonId(const Mesh& m, const unsigned gauss_order)
+    {
+      calderon_identities(m, gauss_order);
+    }
     CalderonMat::CalderonMat(const Geometry& geo,  const std::string interface1, const std::string interface2, const unsigned gauss_order)
     {
       assemble_CM(geo, *this, interface1, interface2, gauss_order);

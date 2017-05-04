@@ -49,6 +49,12 @@ knowledge of the CeCILL-B license and that you accept its terms.
 
 namespace OpenMEEG {
 
+    class OPENMEEG_EXPORT CalderonId: public virtual Matrix {
+    public:
+      CalderonId (const Mesh& m, const unsigned gauss_order=3);
+      virtual ~CalderonId () {};
+    };
+
     class OPENMEEG_EXPORT CalderonMat: public virtual Matrix {
     public:
       CalderonMat (const Geometry& geo, const std::string interface1, const std::string interface2, const unsigned gauss_order=3);

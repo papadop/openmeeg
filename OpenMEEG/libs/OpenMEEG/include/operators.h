@@ -64,7 +64,7 @@ namespace OpenMEEG {
     void operatorDipolePot   (const Vect3& , const Vect3& , const Mesh& , Vector&, const double&, const unsigned, const bool);
 
     template <typename T>
-    inline void _operatorD(const Triangle& T1,const Triangle& T2,T& mat,const double& coeff,const unsigned gauss_order) {
+    inline void _operatorD(const Triangle& T1, const Triangle& T2, T& mat, const double& coeff, const unsigned gauss_order) {
         //this version of _operatorD add in the Matrix the contribution of T2 on T1
         // for all the P1 functions it gets involved
         // consider varying order of quadrature with the distance between T1 and T2
@@ -151,6 +151,11 @@ namespace OpenMEEG {
         if  (T2.contains(V1))
             result = T2.area()/3.0;
         return result;
+    }
+
+    inline double _operatorB1B0(const Triangle& T2, const Vertex& V1) {
+        // TODO
+        return (T2.contains(V1)) ? 0.0 : T2.area()/3.0;
     }
 
     template <typename T>
@@ -306,13 +311,12 @@ namespace OpenMEEG {
         // This function (OPTIMIZED VERSION) has the following arguments:
         //    the 2 interacting meshes
         //    the storage Matrix for the result
-        //    the coefficient to be appleid to each matrix element (depending on conductivities, ...)
+        //    the coefficient to be applied to each matrix element (depending on conductivities, ...)
         //    the gauss order parameter (for adaptive integration)
 
         //In this version of the function, in order to skip multiple computations of the same quantities
         //    loops are run over the triangles but the Matrix cannot be filled in this function anymore
-        //    That's why the filling is done is function _operatorD
-        //
+        //    That's why the filling is done in function _operatorD
 
         unsigned i = 0; // for the PROGRESSBAR
         #pragma omp parallel for
@@ -329,7 +333,7 @@ namespace OpenMEEG {
     }
 
     template <typename T>
-    void operatorD(const Mesh& m1,const Mesh& m2, T& mat,const double& coeff,const unsigned gauss_order,const bool star) {
+    void operatorD(const Mesh& m1,const Mesh& m2, T& mat,const double& coeff,const unsigned gauss_order, const bool star) {
         // This function (OPTIMIZED VERSION) has the following arguments:
         //    the 2 interacting meshes
         //    the storage Matrix for the result
@@ -347,12 +351,33 @@ namespace OpenMEEG {
     }
 
     template <typename T>
-    void operatorP1P0(const Mesh& m, T& mat,const double& coeff) {
+    void operatorP1P0(const Mesh& m, T& mat, const double& coeff) {
         // This time mat(i, j)+= ... the Matrix is incremented by the P1P0 operator
         std::cout << "OPERATOR P1P0... (arg : mesh " << m.name() << " )" << std::endl;
         for (Mesh::const_iterator tit = m.begin(); tit != m.end(); ++tit)
             for (Triangle::const_iterator pit = tit->begin(); pit != tit->end(); ++pit)
                 mat(tit->index(), (*pit)->index()) += _operatorP1P0(*tit, **pit) * coeff;
+    }
+
+    template <typename T>
+    void operatorP1P0GOOD(const Mesh& m, T& mat, const double& coeff) {
+        // This time mat(i, j)+= ... the Matrix is incremented by the P1P0 operator
+        std::cout << "OPERATOR P1P0... (arg : mesh " << m.name() << " )" << std::endl;
+        for (Mesh::const_iterator tit = m.begin(); tit != m.end(); ++tit)
+            for (Triangle::const_iterator pit = tit->begin(); pit != tit->end(); ++pit)
+                mat(tit->index(), (*pit)->index()) += _operatorP1P0(*tit, **pit) * coeff;
+    }
+
+
+    template <typename T>
+    void operatorB1B0(const Mesh& m, T& mat, const double& coeff) {
+        // This time mat(i, j)+= ... the Matrix is incremented by the B1B0 operator
+        std::cout << "OPERATOR B1B0... (arg : mesh " << m.name() << " )" << std::endl;
+        for (Mesh::const_iterator tit = m.begin(); tit != m.end(); ++tit) {
+            for (Mesh::VectPVertex::const_iterator pit = m.vertex_begin(); pit != m.vertex_end(); ++pit) {
+                mat(tit->index(), (*pit)->index()) += _operatorB1B0(*tit, **pit) * coeff;
+            }
+        }
     }
 
     inline Vect3 _operatorFerguson(const Vect3& x,const Vertex& V1,const Mesh& m) {
