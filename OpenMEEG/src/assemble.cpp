@@ -86,19 +86,8 @@ int main(int argc, char** argv)
     /*********************************************************************************************
     * Computation of Head Matrix for BEM Symmetric formulation
     **********************************************************************************************/
-    if ( ( !strcmp(argv[1], "-HeadMat") ) | ( !strcmp(argv[1], "-HM" ) ) | ( !strcmp(argv[1], "-hm") ) ) {
-        if ( argc < 3 ) {
-            std::cerr << "Please set geometry filepath !" << endl;
-            exit(1);
-        }
-        if ( argc < 4 ) {
-            std::cerr << "Please set conductivities filepath !" << endl;
-            exit(1);
-        }
-        if ( argc < 5 ) {
-            std::cerr << "Please set output filepath !" << endl;
-            exit(1);
-        }
+    if ( option(argc, argv, {"-HeadMat","-HM", "-hm"},
+                {"geometry file", "conductivity file", "output file"}) ) {
         // Loading surfaces from geometry file
         Geometry geo;
         geo.read(argv[2], argv[3], OLD_ORDERING);
@@ -112,6 +101,9 @@ int main(int argc, char** argv)
         HeadMat HM(geo, gauss_order);
         HM.save(argv[4]);
     }
+   /*********************************************************************************************
+    * Computation of Calderon Identities
+    **********************************************************************************************/
     else if ( option(argc, argv, {"-CalderonId","-CalId", "-calid"},
                 {"mesh file"}) ) {
         if ( argc < 3 ) {

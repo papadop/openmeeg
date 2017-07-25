@@ -106,6 +106,9 @@ namespace OpenMEEG {
 
 	void calderon_identities(const Mesh& mesh, const unsigned gauss_order)
     {
+        // state: that was a try to verify calderon identities with our operator
+        // (without the ones built on the dual mesh).
+        // This function can be removed.
         // testing Calderon matrix identites:
         //   S I N = (1/4-DD')I
         //   N I'S = (1/4-D*D')I'
@@ -141,8 +144,6 @@ namespace OpenMEEG {
         std::cout << "\n******Devrait etre 0 = " << zero.frobenius_norm() << "\n\n";
 
         mat.set(0.);
-        mat.save("mat0.mat");
-        operatorP1P0GOOD(mesh, mat, 1.);
         mat.save("mat.mat");
         Matrix I = mat.submat(mesh.nb_vertices(), mesh.nb_triangles(), 0, mesh.nb_vertices());
         I.save("I.txt");
@@ -199,23 +200,23 @@ namespace OpenMEEG {
 
         std::cout << "\n-------- S I N I' + (Id-D D*)  ---------" << std::endl;
         zero = (S*I*N*I.transpose() -D*D.transpose());
-        zero.info();
+        // zero.info();
         zero.save("I11.mat");
         std::cout << "******Devrait etre 0 = " << zero.frobenius_norm() << "\n\n";
         zero = (S*I*N*I.transpose() + D*D.transpose());
         std::cout << "******Devrait etre 0 = " << zero.frobenius_norm() << "\n\n";
         zero.save("I12.mat");
-        zero.info();
+        // zero.info();
 
         std::cout << "\n-------- N I' S I + (Id2-D* D)  ---------" << std::endl;
         zero = (N*I.transpose()*S*I -D.transpose()*D);
-        zero.info();
+        // zero.info();
         zero.save("I21.mat");
         std::cout << "******Devrait etre aussi 0 = " << zero.frobenius_norm() << "\n\n";
         zero = (N*I.transpose()*S*I +D.transpose()*D);
         zero.save("I22.mat");
         std::cout << "******Devrait etre aussi 0 = " << zero.frobenius_norm() << "\n\n";
-        zero.info();
+        // zero.info();
 
         std::cout << "\n-------- Evident par symetrie :  ---------" << std::endl;
         std::cout << "-------- K = S I N + I * 0.25  ---------" << std::endl;
@@ -232,6 +233,7 @@ namespace OpenMEEG {
         zero = N * I.transpose()*D - D.transpose()*I*N ;
         std::cout << "\n******Devrait etre 0 = " << zero.frobenius_norm() << "\n\n";
 
+        std::cout << "\n-------- I.frobenius_norm() -------" << I.frobenius_norm() << "\n\n";
         /*
             int i=0;
             for ( Mesh::const_iterator tit1=mesh1.begin(); tit1 != mesh1.end(); ++tit1) {

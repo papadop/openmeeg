@@ -131,6 +131,7 @@ namespace OpenMEEG {
 
     public:
         analyticD3(const Triangle& T): v1(T.s1()), v2(T.s2()), v3(T.s3()) {}
+        analyticD3(const Vect3& v1_, const Vect3& v2_, const Vect3& v3_): v1(v1_), v2(v2_), v3(v3_) {}
 
         ~analyticD3() {}
 

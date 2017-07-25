@@ -204,6 +204,12 @@ namespace OpenMEEG {
             return triangle_integration(fc, points);
         }
 
+        virtual inline T integrate(const I& fc, const Vect3 &p1, const Vect3 &p2, const Vect3 &p3)
+        {
+            const Vect3 points[3] = { p1, p2, p3 };
+            return triangle_integration(fc, points);
+        }
+
     protected:
 
         inline T triangle_integration(const I& fc, const Vect3 points[3])
@@ -239,6 +245,13 @@ namespace OpenMEEG {
 
         virtual inline T integrate(const I& fc, const Triangle& Trg) {
             const Vect3 points[3] = { Trg.s1(), Trg.s2(), Trg.s3() };
+            T I0 = base::triangle_integration(fc, points);
+            return adaptive_integration(fc, points, I0, 0);
+        }
+
+        virtual inline T integrate(const I& fc, const Vect3 &p1, const Vect3 &p2, const Vect3 &p3)
+        {
+            const Vect3 points[3] = { p1, p2, p3 };
             T I0 = base::triangle_integration(fc, points);
             return adaptive_integration(fc, points, I0, 0);
         }
