@@ -36,6 +36,7 @@
     #include <assemble.h>
     #include <gain.h>
     #include <forward.h>
+    #include <operators.h>
 
     using namespace OpenMEEG;
 
@@ -177,6 +178,15 @@ namespace OpenMEEG {
 %include <assemble.h>
 %include <gain.h>
 %include <forward.h>
+%include <operators.h>
+
+namespace OpenMEEG {
+    %template(operatorN_symmatrix) operatorN<SymMatrix>;
+    %template(operatorS_matrix) operatorS<Matrix>;
+    %template(operatorS_symmatrix) operatorS<SymMatrix>;
+    %template(operatorD_matrix) operatorD<Matrix>;
+    %template(operatorD_symmatrix) operatorD<SymMatrix>;
+}
 
 %extend OpenMEEG::Vertex {
     // TODO almost.. if I do: v.index() I get:
