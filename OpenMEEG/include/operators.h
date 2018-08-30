@@ -56,12 +56,14 @@ namespace OpenMEEG {
 
     // #define ADAPT_LHS
 
-    // T can be a Matrix or SymMatrix
+    #ifndef SWIG
     void operatorSinternal(const Mesh& , Matrix& , const Vertices&, const double& );
     void operatorDinternal(const Mesh& , Matrix& , const Vertices&, const double& );
     void operatorFerguson(const Vect3& , const Mesh& , Matrix& , const unsigned&, const double&);
     void operatorDipolePotDer(const Vect3& , const Vect3& , const Mesh& , Vector&, const double&, const unsigned, const bool);
     void operatorDipolePot   (const Vect3& , const Vect3& , const Mesh& , Vector&, const double&, const unsigned, const bool);
+
+    // T can be a Matrix or SymMatrix
 
     template <typename T>
     inline void _operatorD(const Triangle& T1,const Triangle& T2,T& mat,const double& coeff,const unsigned gauss_order) {
@@ -152,6 +154,7 @@ namespace OpenMEEG {
             result = T2.area()/3.0;
         return result;
     }
+    #endif
 
     template <typename T>
     void operatorN(const Mesh& m1,const Mesh& m2,T& mat,const double& coeff,const unsigned gauss_order) {
@@ -355,6 +358,7 @@ namespace OpenMEEG {
                 mat(tit->index(), (*pit)->index()) += _operatorP1P0(*tit, **pit) * coeff;
     }
 
+    #ifndef SWIG
     inline Vect3 _operatorFerguson(const Vect3& x,const Vertex& V1,const Mesh& m) {
         STATIC_OMP Vect3 result;
         STATIC_OMP analyticS analyS;
@@ -382,4 +386,5 @@ namespace OpenMEEG {
         }
         return result;
     }
+    #endif
 }
