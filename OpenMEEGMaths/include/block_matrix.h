@@ -57,7 +57,6 @@ namespace OpenMEEG::maths {
 
     class OPENMEEGMATHS_EXPORT BlockMatrix: public LinOp {
 
-        typedef std::vector<Range>           Ranges;
         typedef std::pair<unsigned,unsigned> Index;
         typedef std::map<Index,Matrix>       Blocks;
 
@@ -72,72 +71,54 @@ namespace OpenMEEG::maths {
         void add_block(const Range& ir,const Range& jr) {
             Index inds = find_block_indices(ir,jr);
             if (inds.first==-1) {
-                iranges.push_back(ir);
-                inds.first = iranges.size()-1;
+                row_ranges.push_back(ir);
+                inds.first = row_ranges.size()-1;
             }
             if (inds.second==-1) {
-                jranges.push_back(jr);
-                inds.second = jranges.size()-1;
+                col_ranges.push_back(jr);
+                inds.second = col_ranges.size()-1;
             }
             blocks[inds] = Matrix(ir.length(),jr.length());
         }
 
-        void set_blocks(const Ranges& rs) {
-            iranges = rs;
-            jranges = rs;
-            for (const auto& ir : iranges)
-                for (const auto& jr : jranges)
+        void set_blocks(const Ranges& rows,const Ranges& cols) {
+            row_ranges = rows;
+            col_ranges = cols;
+            for (const auto& ir : row_ranges)
+                for (const auto& jr : col_ranges)
                     add_block(ir,jr);
         }
 
         double& operator()(const size_t i,const size_t j) {
             const Index& ind = find_block_indices(i,j);
-            const size_t inblockindex_i = i-iranges[ind.first].start();
-            const size_t inblockindex_j = j-jranges[ind.second].start();
+            const size_t inblockindex_i = i-row_ranges[ind.first].start();
+            const size_t inblockindex_j = j-col_ranges[ind.second].start();
             return blocks[ind](inblockindex_i,inblockindex_j);
         }
 
         double  operator()(const size_t i,const size_t j) const {
             const Index& ind = find_block_indices(i,j);
-            const size_t inblockindex_i = i-iranges[ind.first].start();
-            const size_t inblockindex_j = j-jranges[ind.second].start();
+            const size_t inblockindex_i = i-row_ranges[ind.first].start();
+            const size_t inblockindex_j = j-col_ranges[ind.second].start();
             return blocks.at(ind)(inblockindex_i,inblockindex_j);
         }
 
     private:
 
         Index find_block_indices(const Range& ir,const Range& jr) const {
-            const unsigned iind = find_overlapping_range(ir,iranges);
-            if (iind!=-1 && ir!=iranges[iind])
-                throw OverlappingRanges(ir,iranges[iind]);
-            const unsigned jind = find_overlapping_range(jr,jranges);
-            if (jind!=-1 && jr!=iranges[jind])
-                throw OverlappingRanges(jr,iranges[jind]);
+            const unsigned iind = row_ranges.find_index(ir);
+            const unsigned jind = col_ranges.find_index(jr);
             return {iind,jind};
         }
 
-        static unsigned find_overlapping_range(const Range& r,const Ranges& ranges) {
-            for (unsigned i=0;i<ranges.size();++i)
-                if (ranges[i].intersect(r))
-                    return i;
-            return -1;
-        }
-
-        static unsigned find_block_index(const size_t ind,const Ranges& ranges) {
-            for (unsigned i=0;i<ranges.size();++i)
-                if (ranges[i].contains(ind))
-                    return i;
-            throw NonExistingBlock(ind);
-        }
-        
-        Index find_block_indices(const size_t i,const unsigned j) const {
-            const unsigned iind = find_block_index(i,iranges);
-            const unsigned jind = find_block_index(j,jranges);
+        Index find_block_indices(const unsigned i,const unsigned j) const {
+            const unsigned iind = row_ranges.find_index(i);
+            const unsigned jind = col_ranges.find_index(j);
             return { iind, jind };
         }
 
-        Ranges iranges;
-        Ranges jranges;
+        Ranges row_ranges;
+        Ranges col_ranges;
         Blocks blocks;
     };
 }
