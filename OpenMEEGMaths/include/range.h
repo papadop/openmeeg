@@ -40,6 +40,9 @@ knowledge of the CeCILL-B license and that you accept its terms.
 #pragma once
 
 #include <iostream>
+#include <vector>
+
+#include <Exceptions.H>
 
 #include "OpenMEEGMathsConfig.h"
 
@@ -71,4 +74,30 @@ namespace OpenMEEG::maths {
     inline std::ostream& operator<<(std::ostream& os,const Range& r) {
         return os << '(' << r.start() << ',' << r.end() << ')';
     }
+
+    class OPENMEEGMATHS_EXPORT Ranges: public std::vector<Range> {
+
+        typedef std::vector<Range> base;
+
+    public:
+
+        using base::base;
+
+        unsigned find_index(const size_t ind) const {
+            for (unsigned i=0;i<size();++i)
+                if ((*this)[i].contains(ind))
+                    return i;
+            throw NonExistingBlock(ind);
+        }
+
+        unsigned find_index(const Range& range) const {
+            for (unsigned i=0;i<size();++i)
+                if ((*this)[i].intersect(range)) {
+                    if (range!=(*this)[i])
+                        throw OverlappingRanges(range,(*this)[i]);
+                    return i;
+                }
+            return -1;
+        }
+    };
 }
