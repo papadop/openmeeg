@@ -57,6 +57,7 @@ namespace OpenMEEG {
 
     class Geometry;
     using maths::Range;
+    using maths::Ranges;
 
     //  Mesh class
     //  \brief Mesh is a collection of triangles associated to a geometry containing the points
@@ -164,12 +165,12 @@ namespace OpenMEEG {
         /// \brief Get the ranges of the specific mesh in the global matrix.
         /// \return vector of Range \sa
 
-        std::vector<Range> vertices_ranges() const {
+        Ranges vertices_ranges() const {
             std::vector<size_t> indices;
             for (const auto& vertex : vertices())
                 indices.push_back(vertex->index());
             std::sort(indices.begin(),indices.end());
-            std::vector<Range> result;
+            Ranges result;
             for (auto it=indices.begin(); it!=indices.end();) {
                 auto it1 = it;
                 for (auto it2=it1+1; it2!=indices.end() && *it2==*it1+1; it1=it2++);
