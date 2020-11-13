@@ -116,11 +116,11 @@ namespace OpenMEEG {
             const Mesh& mesh;
         };
 
-        template <typename Selector>
-        SymMatrix HeadMatrix(const Geometry& geo,const unsigned gauss_order,const Selector& disableBlock) {
+        template <typename TYPE,typename Selector>
+        TYPE HeadMatrix(const Geometry& geo,const unsigned gauss_order,const Selector& disableBlock) {
 
-            SymMatrix symmatrix(geo.nb_parameters()-geo.nb_current_barrier_triangles());
-            symmatrix.set(0.0);
+            TYPE symmatrix(geo.nb_parameters()-geo.nb_current_barrier_triangles());
+            Operators<true>::init(symmatrix);
 
             // Iterate over pairs of communicating meshes (sharing a domains) to fill the
             // lower half of the HeadMat (since it is symmetric).
@@ -133,6 +133,7 @@ namespace OpenMEEG {
                     continue;
 
                 Operators operators(mesh1,mesh2,gauss_order);
+                operators.set_blocks(symmatrix);
 
                 const double factor = mp.relative_orientation()*K;
 
@@ -159,55 +160,6 @@ namespace OpenMEEG {
 
             return symmatrix;
         }
-
-        #if 0
-        SymmetricBlockMatrix HeadMatrixBlocks(const Geometry& geo,const unsigned gauss_order) {
-
-            SymMatrix symmatrix(geo.nb_parameters()-geo.nb_current_barrier_triangles());
-            //symmatrix.set(0.0);
-
-            // Iterate over pairs of communicating meshes (sharing a domains) to fill the
-            // lower half of the HeadMat (since it is symmetric).
-
-            for (const auto& mp : geo.communicating_mesh_pairs()) {
-                const Mesh& mesh1 = mp(0);
-                const Mesh& mesh2 = mp(1);
-
-                // Create the blocks corresponding to this pair of meshes. In the nested case, each line creates
-                // a single block. This is no longer the case in non-nested meshes.
-
-                symmatrix.add_blocks(Range(mesh1.triangles_range()),Range(mesh2.vertices_ranges())); // D and D* blocks.
-
-                const double factor = mp.relative_orientation()*K;
-
-                // Computing S block first because it is needed for the corresponding N block
-
-                if (!mesh1.current_barrier() && !mesh2.current_barrier() && !disableBlock(mesh1,mesh2)) {
-                    symmatrix.add_blocks(Range(mesh1.triangles_range()),Range(mesh2.triangles_range())); // S blocks.
-                    OpenMEEG::operatorS(mesh1,mesh2,symmatrix,factor,gauss_order);
-                }
-
-                if (!mesh1.current_barrier() && !disableBlock(mesh1,mesh2))
-                    OpenMEEG::operatorD(mesh1,mesh2,symmatrix,-factor,gauss_order);
-
-                if (mesh1!=mesh2 && !mesh2.current_barrier()) // Computing D* block
-                    OpenMEEG::operatorDstar(mesh1,mesh2,symmatrix,-factor,gauss_order);
-
-                // Computing N block
-
-                if (!disableBlock(mesh1,mesh2)) {
-                    symmatrix.add_blocks(Range(mesh1.vertices_ranges()),Range(mesh2.vertices_ranges())); // N blocks.
-                    OpenMEEG::operatorN(mesh1,mesh2,symmatrix,factor,gauss_order);
-                }
-            }
-
-            // Deflate all current barriers as one
-
-            deflate(symmatrix,geo);
-
-            return symmatrix;
-        }
-        #endif
     }
 
     SymMatrix conductivity_coefficients(const Geometry& geo) {
@@ -225,13 +177,13 @@ namespace OpenMEEG {
 
     HeadMat::HeadMat(const Geometry& geo,const unsigned gauss_order) {
         SymMatrix& symmatrix = *this;
-        symmatrix = Details::HeadMatrix(geo,gauss_order,Details::AllBlocks());
+        symmatrix = Details::HeadMatrix<SymMatrix>(geo,gauss_order,Details::AllBlocks());
     }
 
     Matrix HeadMatrix(const Geometry& geo,const Interface& Cortex,const unsigned gauss_order,const unsigned extension=0) {
 
         const Mesh& cortex = Cortex.oriented_meshes().front().mesh();
-        const SymMatrix& symmatrix = Details::HeadMatrix(geo,gauss_order,Details::AllButBlock(cortex));
+        const SymMatrix& symmatrix = Details::HeadMatrix<SymMatrix>(geo,gauss_order,Details::AllButBlock(cortex));
 
         // Copy symmatrix into the returned matrix except for the lines related to the cortex
         // (vertices [i_vb_c, i_ve_c] and triangles [i_tb_c, i_te_c]).

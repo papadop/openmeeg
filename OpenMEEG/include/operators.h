@@ -48,6 +48,7 @@ knowledge of the CeCILL-B license and that you accept its terms.
 #include <vector.h>
 #include <matrix.h>
 #include <symmatrix.h>
+#include <symm_block_matrix.h>
 #include <sparse_matrix.h>
 #include <geometry.h>
 #include <integrator.h>
@@ -174,6 +175,27 @@ namespace OpenMEEG {
 
         Operators(const Mesh& m1,const Mesh& m2,const unsigned order): mesh1(m1),mesh2(m2),gauss_order(order),same_mesh(&mesh1==&mesh2) { }
 
+        // SymMatrix is initialized at once.
+
+        static void init(SymMatrix& matrix) { matrix.set(0.0); }
+        void set_blocks(SymMatrix&) const   { }
+
+        // SymmetricBlockMatrix is initialized blockwise.
+
+        static void init(maths::SymmetricBlockMatrix&) { }
+        void set_blocks(maths::SymmetricBlockMatrix& matrix) const {
+            const Ranges& vrange1 = mesh1.vertices_ranges();
+            const Ranges& vrange2 = mesh2.vertices_ranges();
+            const Ranges& trange1 = { mesh1.triangles_range() };
+            const Ranges& trange2 = { mesh2.triangles_range() };
+
+            matrix.add_blocks(trange1,trange2); // S blocks.
+            matrix.add_blocks(vrange1,vrange2); // N blocks.
+            matrix.add_blocks(trange1,vrange2); // D blocks.
+            if (!same_mesh)
+                matrix.add_blocks(trange2,vrange1); // D* blocks when they are not the transpose of D blocks.
+        }
+        
         // Various operators take the following arguments:
         //  - The coefficient to be applied to each matrix element (depending on conductivities, ...)
         //  - The storage Matrix for the result
