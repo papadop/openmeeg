@@ -50,11 +50,6 @@ namespace OpenMEEG {
 
     SurfSourceMat::SurfSourceMat(const Geometry& geo,Mesh& source_mesh,const unsigned gauss_order) {
 
-        Matrix& mat = *this;
-
-        mat = Matrix((geo.nb_parameters()-geo.nb_current_barrier_triangles()),source_mesh.vertices().size());
-        mat.set(0.0);
-
         // Check that there is no overlapping between the geometry and the source mesh.
 
         if (!geo.check(source_mesh)) {
@@ -76,17 +71,24 @@ namespace OpenMEEG {
                   << " source_mesh located in domain \"" << domain.name() << "\"." << std::endl
                   << std::endl;
 
+        Matrix& mat = *this;
+        mat = Matrix((geo.nb_parameters()-geo.nb_current_barrier_triangles()),source_mesh.vertices().size());
+        mat.set(0.0);
+
         const double K  = 1.0/(4*Pi);
         const double L  = -1.0/domain.conductivity();
         for (const auto& boundary : domain.boundaries()) {
             const double factorN = (boundary.inside()) ? K : -K;
             for (const auto& oriented_mesh : boundary.interface().oriented_meshes()) {
                 const Mesh& mesh = oriented_mesh.mesh();
+
+                Operators operators(mesh,source_mesh,gauss_order);
+
                 // First block is nVertexFistLayer*source_mesh.vertices().size()
                 const double coeffN = factorN*oriented_mesh.orientation();
-                operatorN(mesh,source_mesh,mat,coeffN,gauss_order);
+                operators.N(coeffN,mat);
                 // Second block is nFacesFistLayer*source_mesh.vertices().size()
-                operatorD(mesh,source_mesh,mat,coeffN*L,gauss_order);
+                operators.D(coeffN*L,mat);
             }
         }
     }
@@ -94,11 +96,10 @@ namespace OpenMEEG {
     DipSourceMat::DipSourceMat(const Geometry& geo,const Matrix& dipoles,const unsigned gauss_order,
                                const bool adapt_rhs,const std::string& domain_name)
     {
-        Matrix& rhs = *this;
-
         const size_t size      = geo.nb_parameters()-geo.nb_current_barrier_triangles();
         const size_t n_dipoles = dipoles.nlin();
 
+        Matrix& rhs = *this;
         rhs = Matrix(size,n_dipoles);
         rhs.set(0.0);
 
@@ -116,9 +117,9 @@ namespace OpenMEEG {
             if (cond!=0.0) {
                 rhs_col.set(0.0);
                 const double K = 1.0/(4*Pi);
-                for (const auto& boundary : domain.boundaries()) { //  Iterate over the domain's interfaces (half-spaces)
+                for (const auto& boundary : domain.boundaries()) {
                     const double factorD = (boundary.inside()) ? K : -K;
-                    for (const auto& oriented_mesh : boundary.interface().oriented_meshes()) { //  Iterate over the meshes of the interface
+                    for (const auto& oriented_mesh : boundary.interface().oriented_meshes()) {
                         //  Treat the mesh.
                         const double coeffD = factorD*oriented_mesh.orientation();
                         const Mesh&  mesh   = oriented_mesh.mesh();
@@ -136,90 +137,80 @@ namespace OpenMEEG {
     }
 
     EITSourceMat::EITSourceMat(const Geometry& geo,const Sensors& electrodes,const unsigned gauss_order) {
-        Matrix& mat = *this;
 
-        //  A Matrix to be applied to the scalp-injected current to obtain the Source Term of the EIT foward problem.
+        // Matrix to be applied to the scalp-injected current to obtain the Source Term of the EIT foward problem.
         // following article BOUNDARY ELEMENT FORMULATION FOR ELECTRICAL IMPEDANCE TOMOGRAPHY
         // (eq.14 (do not look at eq.16 since there is a mistake: D_23 -> S_23))
         // rhs = [0 ... 0  -D*_23  sigma_3^(-1)S_23  -I_33/2.+D*_33]
 
-        size_t n_sensors = electrodes.getNumberOfSensors();
-
+        const size_t n_sensors = electrodes.getNumberOfSensors();
         const double K = 1.0/(4*Pi);
 
-        //  transmat = a big SymMatrix of which mat = part of its transpose.
         SymMatrix transmat(geo.nb_parameters());
         transmat.set(0.0);
-        mat = Matrix((geo.nb_parameters()-geo.nb_current_barrier_triangles()), n_sensors);
-        mat.set(0.0);
 
         for (const auto& mesh1 : geo.meshes())
             if (mesh1.current_barrier())
                 for (const auto& mesh2 : geo.meshes()) {
+                    const Operators operators(mesh1,mesh2,gauss_order);
                     const int orientation = geo.oriented(mesh1,mesh2);
-                    if (orientation != 0){
-                        // D*_23 or D*_33
-                        operatorDstar(mesh2,mesh1,transmat,K*orientation,gauss_order);
-                        if (mesh1==mesh2) {
-                            // I_33
+                    if (orientation!=0){ // D*_23 or D*_33
+                        operators.D(K*orientation,transmat);
+                        if (mesh1==mesh2) { // I_33
                             operatorP1P0(mesh1,transmat,-0.5*orientation);
-                        } else {
-                            // S_23
-                            operatorS(mesh2,mesh1,transmat,geo.sigma_inv(mesh1,mesh2)*(-1.0*K*orientation),gauss_order);
+                        } else { // S_23
+                            operators.S(geo.sigma_inv(mesh1,mesh2)*(-1.0*K*orientation),transmat);
                         }
                     }
                 }
 
-        for ( size_t ielec = 0; ielec < n_sensors; ++ielec) {
-            Triangles tris = electrodes.getInjectionTriangles(ielec);
-            for ( Triangles::const_iterator tit = tris.begin(); tit != tris.end(); ++tit) {
-                // to ensure exactly no accumulation of currents. w = elec_area/tris_area (~= 1)
-                double inv_area = electrodes.getWeights()(ielec);
-                // if no radius is given, we assume the user wants to specify an intensity not a density of current
-                if ( almost_equal(electrodes.getRadii()(ielec), 0.) ) {
-                    inv_area = 1./tit->area();
-                }
-                for ( size_t i = 0; i < (geo.nb_parameters() - geo.nb_current_barrier_triangles()); ++i) {
-                    mat(i, ielec) += transmat(tit->index(), i) * inv_area;
-                }
+        Matrix& mat = *this;
+        mat = Matrix((geo.nb_parameters()-geo.nb_current_barrier_triangles()), n_sensors);
+        mat.set(0.0);
+
+        for (size_t ielec=0; ielec<n_sensors; ++ielec)
+            for (const auto& triangle : electrodes.getInjectionTriangles(ielec)) {
+                // To ensure exactly no accumulation of currents. w = electrode_area/triangle_area (~= 1)
+                // If no radius is given, we assume the user wants to specify an intensity not a density of current.
+                const double coeff = (almost_equal(electrodes.getRadii()(ielec),0.)) ? 1.0/triangle.area() : electrodes.getWeights()(ielec);
+                for (size_t i=0; i<(geo.nb_parameters()-geo.nb_current_barrier_triangles()); ++i)
+                    mat(i,ielec) += transmat(triangle.index(),i)*coeff;
             }
-        }
     }
 
     DipSource2InternalPotMat::DipSource2InternalPotMat(const Geometry& geo,const Matrix& dipoles,const Matrix& points,const std::string& domain_name) {
 
-        Matrix& mat = *this;
-
         // Points with one more column for the index of the domain they belong
 
         std::vector<const Domain*> points_domain;
-        std::vector<Vect3>   points_;
+        std::vector<Vect3>         pts;
         for (unsigned i=0; i<points.nlin(); ++i) {
             const Domain& domain = geo.domain(Vect3(points(i,0),points(i,1),points(i,2)));
             if (domain.conductivity()!=0.0) {
                 points_domain.push_back(&domain);
-                points_.push_back(Vect3(points(i,0),points(i,1),points(i,2)));
+                pts.push_back(Vect3(points(i,0),points(i,1),points(i,2)));
             } else {
                 std::cerr << " DipSource2InternalPot: Point [ " << points.getlin(i);
                 std::cerr << "] is outside the head. Point is dropped." << std::endl;
             }
         }
-        const double K = 1.0/(4*Pi);
-        mat = Matrix(points_.size(), dipoles.nlin());
+
+        Matrix& mat = *this;
+        mat = Matrix(pts.size(),dipoles.nlin());
         mat.set(0.0);
 
         for (unsigned iDIP=0; iDIP<dipoles.nlin(); ++iDIP) {
-            const Vect3 r0(dipoles(iDIP,0), dipoles(iDIP,1), dipoles(iDIP,2));
-            const Vect3  q(dipoles(iDIP,3), dipoles(iDIP,4), dipoles(iDIP,5));
+            const Vect3 r0(dipoles(iDIP,0),dipoles(iDIP,1),dipoles(iDIP,2));
+            const Vect3  q(dipoles(iDIP,3),dipoles(iDIP,4),dipoles(iDIP,5));
 
             const Domain& domain = (domain_name=="") ? geo.domain(r0) : geo.domain(domain_name);
-            const double  cond   = domain.conductivity();
+            const double  coeff  = 1.0/(4*Pi*domain.conductivity());
 
             static analyticDipPot anaDP;
-            anaDP.init(q, r0);
-            for (unsigned iPTS=0; iPTS<points_.size(); ++iPTS)
+            anaDP.init(q,r0);
+            for (unsigned iPTS=0; iPTS<pts.size(); ++iPTS)
                 if (points_domain[iPTS]==&domain)
-                    mat(iPTS, iDIP) += K/cond*anaDP.f(points_[iPTS]);
+                    mat(iPTS,iDIP) += coeff*anaDP.f(pts[iPTS]);
         }
     }
 }

@@ -43,6 +43,7 @@ knowledge of the CeCILL-B license and that you accept its terms.
 #pragma once
 
 #include <iostream>
+#include <iomanip>
 
 #include <vector.h>
 #include <matrix.h>
@@ -91,65 +92,6 @@ namespace OpenMEEG {
             }
         }
 
-        // T can be a Matrix or SymMatrix
-
-        template <typename T>
-        inline void operatorD(const Triangle& T1,const Triangle& T2,T& mat,const double& coeff,const unsigned gauss_order) {
-            //this version of operatorD add in the Matrix the contribution of T2 on T1
-            // for all the P1 functions it gets involved
-            // consider varying order of quadrature with the distance between T1 and T2
-            analyticD3 analyD(T2);
-
-        #ifdef ADAPT_LHS
-            AdaptiveIntegrator<Vect3, analyticD3> gauss(0.005);
-            gauss.setOrder(gauss_order);
-        #else
-            STATIC_OMP Integrator<Vect3, analyticD3> gauss(gauss_order);
-        #endif
-            const Vect3 total = gauss.integrate(analyD,T1);
-
-            for (unsigned i=0; i<3; ++i)
-                mat(T1.index(),T2.vertex(i).index()) += total(i)*coeff;
-        }
-
-        inline double operatorS(const analyticS& analyS,const Triangle& T2,const unsigned gauss_order) {
-        #ifdef ADAPT_LHS
-            AdaptiveIntegrator<double,analyticS> gauss(0.005);
-        #else
-            STATIC_OMP Integrator<double,analyticS> gauss;
-        #endif
-            gauss.setOrder(gauss_order);
-            return gauss.integrate(analyS,T2);
-        }
-
-        template <typename T>
-        inline double operatorN(const Vertex& V1,const Vertex& V2,const Mesh& m1,const Mesh& m2,const T& mat) {
-
-            const bool same_shared_vertex = ((&m1!=&m2) && (V1==V2));
-            const double factor = (same_shared_vertex) ? 0.5 : 0.25;
-
-            double result = 0.0;
-            for (const auto& tp1 : m1.triangles(V1)) {
-                const Edge& edge1 = tp1->edge(V1);
-                const Vect3& CB1 = edge1.vertex(0)-edge1.vertex(1);
-                const unsigned ind1 = tp1->index()-m1.triangles().front().index();
-                for (const auto& tp2 : m2.triangles(V2)) {
-
-                    const unsigned ind2 = tp2->index()-m2.triangles().front().index();
-
-                    // In the second case, we here divided (precalculated) operatorS by the product of areas.
-
-                    const double Iqr = (m1.current_barrier() || m2.current_barrier()) ? mat(ind1,ind2) : mat(tp1->index(),tp2->index())/(tp1->area()*tp2->area());
-
-                    const Edge& edge2 = tp2->edge(V2);
-                    const Vect3& CB2 = edge2.vertex(0)-edge2.vertex(1);
-
-                    result -= factor*Iqr*dotprod(CB1,CB2);
-                }
-            }
-            return result;
-        }
-
         inline Vect3 operatorFerguson(const Vect3& x,const Vertex& V,const Mesh& m) {
             Vect3 result;
             result = 0.0;
@@ -180,120 +122,96 @@ namespace OpenMEEG {
                 result = T2.area()/3.0;
             return result;
         }
-
-        template <typename T>
-        void operatorD(const Mesh& m1,const Mesh& m2,T& mat,const double& coeff,const unsigned gauss_order) {
-            // This function (OPTIMIZED VERSION) has the following arguments:
-            //    the 2 interacting meshes
-            //    the storage Matrix for the result
-            //    the coefficient to be appleid to each matrix element (depending on conductivities, ...)
-            //    the gauss order parameter (for adaptive integration)
-
-            // In this version of the function, in order to skip multiple computations of the same quantities
-            //    loops are run over the triangles but the Matrix cannot be filled in this function anymore
-            //    That's why the filling is done is function Details::operatorD
-            //
-
-            ProgressBar pb(m1.triangles().size());
-            const Triangles& m1_triangles = m1.triangles();
-            #pragma omp parallel for
-            #if defined NO_OPENMP || defined OPENMP_RANGEFOR
-            for (const auto& triangle1 : m1_triangles) {
-            #elif defined OPENMP_ITERATOR
-            for (Triangles::const_iterator tit1=m1_triangles.begin();tit1<m1_triangles.end();++tit1) {
-                const Triangle& triangle1 = *tit1;
-            #else
-            for (int i1=0; i1 < m1_triangles.size(); ++i1) {
-                const Triangle& triangle1 = *(m1_triangles.begin()+i1);
-            #endif
-                for (const auto& triangle2 : m2.triangles())
-                    Details::operatorD(triangle1,triangle2,mat,coeff,gauss_order);
-                ++pb;
-            }
-        }
     }
 
-    template <typename T>
-    void operatorN(const Mesh& m1,const Mesh& m2,T& mat,const double& coeff,const unsigned gauss_order) {
-        // This function has the following arguments:
-        //    the 2 interacting meshes
-        //    the storage Matrix for the result
-        //    the coefficient to be applied to each matrix element (depending on conductivities, ...)
-        //    the gauss order parameter (for adaptive integration)
+    template <bool VERBOSE=true>
+    class Operators {
 
-        std::cout << "OPERATOR N ... (arg : mesh " << m1.name() << " , mesh " << m2.name() << " )" << std::endl;
+        class Bloc: public Matrix {
 
-        if (&m1==&m2) {
-            auto NUpdate = [&](const Mesh& m,const auto& M) {
-                ProgressBar pb(m1.vertices().size());
-                for (auto vit1=m.vertices().begin();vit1!=m.vertices().end();++vit1) {
-                    #pragma omp parallel for
-                    #if defined NO_OPENMP || defined OPENMP_ITERATOR
-                    for (auto vit2=vit1;vit2<m.vertices().end();++vit2) {
-                    #else
-                    for (int i2=0;i2<=vit1-m1.vertices().begin();++i2) {
-                        const auto vit2 = m1.vertices().begin()+i2;
-                    #endif
-                        mat((*vit1)->index(),(*vit2)->index()) += Details::operatorN(**vit1,**vit2,m,m,M)*coeff;
-                    }
-                    ++pb;
-                }
-            };
+            typedef Matrix base;
 
-            if (m1.current_barrier()) {
-                // Precompute operator S divided by the product of triangles area.
+        public:
 
-                ProgressBar pb(m1.triangles().size());
-                SymMatrix matS(m1.triangles().size());
-                for (Triangles::const_iterator tit1=m1.triangles().begin();tit1!=m1.triangles().end();++tit1) {
-                    const analyticS analyS(*tit1);
-                    const unsigned ind1 = tit1->index()-m1.triangles().front().index();
-                    #pragma omp parallel for
-                    #if defined NO_OPENMP || defined OPENMP_ITERATOR
-                    for (Triangles::const_iterator tit2=tit1;tit2<m1.triangles().end();++tit2) {
-                    #else
-                    for (int i2=tit1-m1.triangles().begin();i2<m1.triangles().size();++i2) {
-                        const Triangles::const_iterator tit2 = m1.triangles().begin()+i2;
-                    #endif
-                        const unsigned ind2 = tit2->index()-m2.triangles().front().index();
-                        matS(ind1,ind2) = Details::operatorS(analyS,*tit2,gauss_order)/(tit1->area()*tit2->area());
-                    }
-                    ++pb;
-                }
-                NUpdate(m1,matS);
-            } else {
-                NUpdate(m1,mat);
-            }
-        } else {
-            auto NUpdate = [&](const Mesh& m1,const Mesh& m2,const auto& M) {
-                ProgressBar pb(m1.vertices().size());
-                const VerticesRefs& v2 = m2.vertices();
-                for (const auto& vertex1 : m1.vertices()) {
-                    #pragma omp parallel for
-                    #if defined NO_OPENMP || defined OPENMP_RANGEFOR
-                    for (const auto& vertex2 : v2) {
-                    #elif defined OPENMP_ITERATOR
-                    for (auto vit2=v2.begin();vit2<v2.end();++vit2) {
-                        const Vertex* vertex2 = *vit2;
-                    #else
-                    for (int i2=0;i2<v2.size();++i2) {
-                        const Vertex* vertex2 = *(v2.begin()+i2);
-                    #endif
-                        mat(vertex1->index(),vertex2->index()) += Details::operatorN(*vertex1,*vertex2,m1,m2,M)*coeff;
-                    }
-                    ++pb;
-                }
-            };
+            Bloc(const unsigned r0,const unsigned c0,const unsigned n,const unsigned m): i0(r0),j0(c0),base(n,m) { }
 
-            if (m1.current_barrier() || m2.current_barrier()) {
-                // Precompute operator S divided by the product of triangles area.
-                Matrix matS(m1.triangles().size(),m2.triangles().size());
-                ProgressBar pb(m1.triangles().size());
-                unsigned i = 0;
-                for (const auto& triangle1 : m1.triangles()) {
+            double& operator()(const unsigned i,const unsigned j)       { return base::operator()(i-i0,j-j0); }
+            double  operator()(const unsigned i,const unsigned j) const { return base::operator()(i-i0,j-j0); }
+
+        private:
+
+            const unsigned i0;
+            const unsigned j0;
+        };
+        
+        class SymBloc: public SymMatrix {
+
+            typedef SymMatrix base;
+
+        public:
+
+            SymBloc(const unsigned off,const unsigned sz): offset(off),base(sz) { }
+
+            double& operator()(const unsigned i,const unsigned j)       { return base::operator()(i-offset,j-offset); }
+            double  operator()(const unsigned i,const unsigned j) const { return base::operator()(i-offset,j-offset); }
+
+        private:
+
+            const unsigned offset;
+        };
+        
+        void message(const char* op_name) const {
+            if (VERBOSE)
+                std::cout << "OPERATOR " << std::left << std::setw(2) << op_name << "... (arg : mesh " << mesh1.name() << " , mesh " << mesh2.name() << " )" << std::endl;
+        }
+
+    public:
+
+        // This constructor takes the following arguments:
+        //  - The 2 interacting meshes.
+        //  - The gauss order parameter (for adaptive integration).
+        //  - A verbosity parameters (for printing the action on the terminal).
+
+        Operators(const Mesh& m1,const Mesh& m2,const unsigned order): mesh1(m1),mesh2(m2),gauss_order(order),same_mesh(&mesh1==&mesh2) { }
+
+        // Various operators take the following arguments:
+        //  - The coefficient to be applied to each matrix element (depending on conductivities, ...)
+        //  - The storage Matrix for the result
+
+        template <typename T>
+        void S(const double& coeff,T& matrix) const {
+            message("S");
+            ProgressBar pb(mesh1.triangles().size());
+
+            // Operator S is given by Sij=\Int G*PSI(I,i)*Psi(J,j) with PSI(l,t) a P0 test function on layer l and triangle t.
+
+            if (same_mesh) {
+
+                // When meshes are equal, optimized computation for a symmetric matrix.
+
+                const Triangles& triangles = mesh1.triangles();
+                for (Triangles::const_iterator tit1=triangles.begin(); tit1!=triangles.end(); ++tit1,++pb) {
+                    const Triangle& triangle1 = *tit1;
                     const analyticS analyS(triangle1);
-                    const unsigned ind1 = triangle1.index()-m1.triangles().front().index();
-                    const Triangles& m2_triangles = m2.triangles();
+                    #pragma omp parallel for
+                    #if defined NO_OPENMP || defined OPENMP_ITERATOR
+                    for (Triangles::const_iterator tit2=tit1; tit2!=triangles.end(); ++tit2) {
+                        const Triangle& triangle2 = *tit2;
+                    #else
+                    for (int i2=tit1-triangles.begin(); i2<triangles.size(); ++i2) {
+                        const Triangle& triangle2 = *(triangles.begin()+i2);
+                    #endif
+                        matrix(triangle1.index(),triangle2.index()) = S(analyS,triangle2)*coeff;
+                    }
+                }
+            } else {
+                // TODO check the symmetry of S. 
+                // if we invert tit1 with tit2: results in HeadMat differs at 4.e-5 which is too big.
+                // using ADAPT_LHS with tolerance at 0.000005 (for S) drops this at 6.e-6 (but increase the computation time).
+
+                for (const auto& triangle1 : mesh1.triangles()) {
+                    const analyticS analyS(triangle1);
+                    const Triangles& m2_triangles = mesh2.triangles();
                     #pragma omp parallel for
                     #if defined NO_OPENMP || defined OPENMP_RANGEFOR
                     for (const auto& triangle2 : m2_triangles) {
@@ -304,94 +222,188 @@ namespace OpenMEEG {
                     for (int i2=0;i2<m2_triangles.size();++i2) {
                         const Triangle& triangle2 = *(m2_triangles.begin()+i2);
                     #endif
-                        const unsigned ind2 = triangle2.index()-m2_triangles.front().index();
-                        matS(ind1,ind2) = Details::operatorS(analyS,triangle2,gauss_order)/(triangle1.area()*triangle2.area());
+                        matrix(triangle1.index(),triangle2.index()) = S(analyS,triangle2)*coeff;
                     }
                     ++pb;
                 }
-                NUpdate(m1,m2,matS);
-            } else {
-                NUpdate(m1,m2,mat);
             }
         }
-    }
 
-    template <typename T>
-    void operatorS(const Mesh& m1,const Mesh& m2,T& mat,const double& coeff,const unsigned gauss_order) {
+        template <typename T1,typename T2>
+        void N(const double& coeff,const T1& S,T2& matrix) const {
 
-        // This function has the following arguments:
-        //    the 2 interacting meshes
-        //    the storage Matrix for the result
-        //    the coefficient to be applied to each matrix element (depending on conductivities, ...)
-        //    the gauss order parameter (for adaptive integration)
+            message("N");
 
-        std::cout << "OPERATOR S ... (arg : mesh " << m1.name() << " , mesh " << m2.name() << " )" << std::endl;
+            ProgressBar pb(mesh1.vertices().size());
+            if (same_mesh) {
 
-        // The operator S is given by Sij=\Int G*PSI(I, i)*Psi(J, j) with
-        // PSI(A, a) is a P0 test function on layer A and triangle a
-        if (&m1==&m2) {
-            ProgressBar pb(m1.triangles().size());
-            for (Triangles::const_iterator tit1=m1.triangles().begin(); tit1!=m1.triangles().end(); ++tit1,++pb) {
-                const analyticS analyS(*tit1);
-                #pragma omp parallel for
-                #if defined OPENMP_ITERATOR
-                for (Triangles::const_iterator tit2=tit1;tit2<m1.triangles().end();++tit2) {
-                #else
-                for (int i2=tit1-m1.triangles().begin();i2<m1.triangles().size();++i2) {
-                    const Triangles::const_iterator tit2 = m1.triangles().begin()+i2;
-                #endif
-                    mat(tit1->index(),tit2->index()) = Details::operatorS(analyS,*tit2,gauss_order)*coeff;
+                // When meshes are equal, optimized computation for a symmetric matrix.
+
+                for (auto vit1=mesh1.vertices().begin(); vit1!=mesh1.vertices().end(); ++vit1) {
+                    #pragma omp parallel for
+                    #if defined NO_OPENMP || defined OPENMP_ITERATOR
+                    for (auto vit2=vit1; vit2<mesh1.vertices().end(); ++vit2) {
+                    #else
+                    for (int i2=0;i2<=vit1-mesh1.vertices().begin();++i2) {
+                        const auto vit2 = mesh1.vertices().begin()+i2;
+                    #endif
+                        matrix((*vit1)->index(),(*vit2)->index()) += N(**vit1,**vit2,mesh1,S)*coeff;
+                    }
+                    ++pb;
+                }
+            } else {
+                const VerticesRefs& m2_vertices = mesh2.vertices();
+                for (const auto& vertex1 : mesh1.vertices()) {
+                    #pragma omp parallel for
+                    #if defined NO_OPENMP || defined OPENMP_RANGEFOR
+                    for (const auto& vertex2 : m2_vertices) {
+                    #elif defined OPENMP_ITERATOR
+                    for (auto vit2=m2_vertices.begin(); vit2<m2_vertices.end(); ++vit2) {
+                        const Vertex* vertex2 = *vit2;
+                    #else
+                    for (int i2=0; i2<m2_vertices.size(); ++i2) {
+                        const Vertex* vertex2 = *(m2_vertices.begin()+i2);
+                    #endif
+                        matrix(vertex1->index(),vertex2->index()) += N(*vertex1,*vertex2,mesh1,mesh2,S)*coeff;
+                    }
+                    ++pb;
                 }
             }
-        } else {
-            // TODO check the symmetry of Details::operatorS. 
-            // if we invert tit1 with tit2: results in HeadMat differs at 4.e-5 which is too big.
-            // using ADAPT_LHS with tolerance at 0.000005 (for Details::opS) drops this at 6.e-6. (but increase the computation time)
+        }
+
+        //  Operator N in case one of the mesh is a current barrier.
+
+        template <typename T>
+        void N(const double& coeff,T& matrix) const {
+            if (same_mesh) { // When meshes are equal, optimized computation for a symmetric matrix.
+                SymBloc Sbloc(mesh1.triangles().front().index(),mesh1.triangles().size());
+                S(1.0,Sbloc);
+                N(coeff,Sbloc,matrix);
+            } else {
+                Bloc Sbloc(mesh1.triangles().front().index(),mesh2.triangles().front().index(),mesh1.triangles().size(),mesh2.triangles().size());
+                S(1.0,Sbloc);
+                N(coeff,Sbloc,matrix);
+            }
+        }
+
+        template <typename T>
+        void D(const double& coeff,T& matrix) const {
+            // This function (OPTIMIZED VERSION) has the following arguments:
+            //    the coefficient to be applied to each matrix element (depending on conductivities, ...)
+            //    the storage Matrix for the result
+
+            message("D");
+            D(mesh1,mesh2,coeff,matrix);
+        }
+
+        template <typename T>
+        void Dstar(const double& coeff,T& matrix) const {
+            // This function (OPTIMIZED VERSION) has the following arguments:
+            //    the coefficient to be applied to each matrix element (depending on conductivities, ...)
+            //    the storage Matrix for the result
+
+            message("D*");
+            D(mesh2,mesh1,coeff,matrix);
+        }
+
+    private:
+
+        double S(const analyticS& analyS,const Triangle& triangle) const {
+        #ifdef ADAPT_LHS
+            AdaptiveIntegrator<double,analyticS> gauss(0.005);
+        #else
+            STATIC_OMP Integrator<double,analyticS> gauss;
+        #endif
+            gauss.setOrder(gauss_order);
+            return gauss.integrate(analyS,triangle);
+        }
+
+        template <typename T>
+        double N(const Vertex& V1,const Vertex& V2,const Mesh& m,const T& matrix) const {
+            return N(0.25,V1,V2,m,m,matrix);
+        }
+
+        // This function assumes that the two meshes are different.
+
+        template <typename T>
+        double N(const Vertex& V1,const Vertex& V2,const Mesh& m1,const Mesh& m2,const T& matrix) const {
+            const double coeff = (V1==V2) ? 0.5 : 0.25;
+            return N(coeff,V1,V2,m1,m2,matrix);
+        }
+
+        template <typename T>
+        double N(const double& factor,const Vertex& V1,const Vertex& V2,const Mesh& m1,const Mesh& m2,const T& matrix) const {
+
+            double result = 0.0;
+            for (const auto& tp1 : m1.triangles(V1)) {
+                const Edge& edge1 = tp1->edge(V1);
+                const Vect3& CB1 = edge1.vertex(0)-edge1.vertex(1);
+                for (const auto& tp2 : m2.triangles(V2)) {
+
+                    const Edge& edge2 = tp2->edge(V2);
+                    const Vect3& CB2 = edge2.vertex(0)-edge2.vertex(1);
+
+                    result -= factor*dotprod(CB1,CB2)*matrix(tp1->index(),tp2->index())/(tp1->area()*tp2->area());
+                }
+            }
+            return result;
+        }
+
+        template <typename T>
+        void D(const Triangle& T1,const Triangle& T2,T& mat,const double& coeff) const {
+            //this version of operatorD add in the Matrix the contribution of T2 on T1
+            // for all the P1 functions it gets involved
+            // consider varying order of quadrature with the distance between T1 and T2
+            analyticD3 analyD(T2);
+
+        #ifdef ADAPT_LHS
+            AdaptiveIntegrator<Vect3,analyticD3> gauss(0.005);
+            gauss.setOrder(gauss_order);
+        #else
+            STATIC_OMP Integrator<Vect3, analyticD3> gauss(gauss_order);
+        #endif
+            const Vect3 total = gauss.integrate(analyD,T1);
+
+            for (unsigned i=0; i<3; ++i)
+                mat(T1.index(),T2.vertex(i).index()) += total(i)*coeff;
+        }
+
+        template <typename T>
+        void D(const Mesh& m1,const Mesh& m2,const double& coeff,T& mat) const {
+            // This function (OPTIMIZED VERSION) has the following arguments:
+            //    the 2 interacting meshes
+            //    the storage Matrix for the result
+            //    the coefficient to be appleid to each matrix element (depending on conductivities, ...)
+            //    the gauss order parameter (for adaptive integration)
+
+            // In this version of the function, in order to skip multiple computations of the same quantities
+            //    loops are run over triangles but the Matrix cannot be filled in this function anymore
+            //    That's why the filling is done is function Details::operatorD
+            //
 
             ProgressBar pb(m1.triangles().size());
-            for (const auto& triangle1 : m1.triangles()) {
-                const analyticS analyS(triangle1);
-                const Triangles& m2_triangles = m2.triangles();
-                #pragma omp parallel for
-                #if defined NO_OPENMP || defined OPENMP_RANGEFOR
-                for (const auto& triangle2 : m2_triangles) {
-                #elif defined OPENMP_ITERATOR
-                for (Triangles::const_iterator tit2=m2_triangles.begin();tit2<m2_triangles.end();++tit2) {
-                    const Triangle& triangle2 = *tit2;
-                #else
-                for (int i2=0;i2<m2_triangles.size();++i2) {
-                    const Triangle& triangle2 = *(m2_triangles.begin()+i2);
-                #endif
-                    mat(triangle1.index(),triangle2.index()) = Details::operatorS(analyS,triangle2,gauss_order)*coeff;
-                }
+            const Triangles& m1_triangles = m1.triangles();
+            #pragma omp parallel for
+            #if defined NO_OPENMP || defined OPENMP_RANGEFOR
+            for (const auto& triangle1 : m1_triangles) {
+            #elif defined OPENMP_ITERATOR
+            for (Triangles::const_iterator tit1=m1_triangles.begin(); tit1<m1_triangles.end(); ++tit1) {
+                const Triangle& triangle1 = *tit1;
+            #else
+            for (int i1=0; i1<m1_triangles.size(); ++i1) {
+                const Triangle& triangle1 = *(m1_triangles.begin()+i1);
+            #endif
+                for (const auto& triangle2 : m2.triangles())
+                    D(triangle1,triangle2,mat,coeff);
                 ++pb;
             }
         }
-    }
 
-    template <typename T>
-    void operatorD(const Mesh& m1,const Mesh& m2,T& mat,const double& coeff,const unsigned gauss_order) {
-        // This function (OPTIMIZED VERSION) has the following arguments:
-        //    the 2 interacting meshes
-        //    the storage Matrix for the result
-        //    the coefficient to be appleid to each matrix element (depending on conductivities, ...)
-        //    the gauss order parameter (for adaptive integration)
-
-        std::cout << "OPERATOR D... (arg : mesh " << m1.name() << " , mesh " << m2.name() << " )" << std::endl;
-        Details::operatorD(m1,m2,mat,coeff,gauss_order);
-    }
-
-    template <typename T>
-    void operatorDstar(const Mesh& m1,const Mesh& m2,T& mat,const double& coeff,const unsigned gauss_order) {
-        // This function (OPTIMIZED VERSION) has the following arguments:
-        //    the 2 interacting meshes
-        //    the storage Matrix for the result
-        //    the coefficient to be appleid to each matrix element (depending on conductivities, ...)
-        //    the gauss order parameter (for adaptive integration)
-
-        std::cout << "OPERATOR D*... (arg : mesh " << m1.name() << " , mesh " << m2.name() << ')' << std::endl;
-        Details::operatorD(m2,m1,mat,coeff,gauss_order);
-    }
+        const Mesh&    mesh1;
+        const Mesh&    mesh2;
+        const unsigned gauss_order;
+        const bool     same_mesh;
+    };
 
     template <typename T>
     void operatorP1P0(const Mesh& m,T& mat,const double& coeff) {

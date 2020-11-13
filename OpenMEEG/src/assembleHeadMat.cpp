@@ -129,29 +129,28 @@ namespace OpenMEEG {
                 const Mesh& mesh1 = mp(0);
                 const Mesh& mesh2 = mp(1);
 
+                if (disableBlock(mesh1,mesh2))
+                    continue;
+
+                Operators operators(mesh1,mesh2,gauss_order);
+
                 const double factor = mp.relative_orientation()*K;
 
-                double Ncoeff;
-                if (!mesh1.current_barrier() && !mesh2.current_barrier() && !disableBlock(mesh1,mesh2)) {
+                if (!mesh1.current_barrier() && !mesh2.current_barrier()) {
                     // Computing S block first because it is needed for the corresponding N block
                     const double inv_cond = geo.sigma_inv(mesh1,mesh2);
-                    OpenMEEG::operatorS(mesh1,mesh2,symmatrix,factor*inv_cond,gauss_order);
-                    Ncoeff = geo.sigma(mesh1,mesh2)/inv_cond;
+                    operators.S(factor*inv_cond,symmatrix);
+                    operators.N(geo.sigma(mesh1,mesh2)/inv_cond,symmatrix,symmatrix);
                 } else {
-                    Ncoeff = factor*geo.sigma(mesh1,mesh2);
+                    operators.N(factor*geo.sigma(mesh1,mesh2),symmatrix);
                 }
 
                 const double Dcoeff = -factor*geo.indicator(mesh1,mesh2);
-                if (!mesh1.current_barrier() && !disableBlock(mesh1,mesh2))
-                    OpenMEEG::operatorD(mesh1,mesh2,symmatrix,Dcoeff,gauss_order);
+                if (!mesh1.current_barrier())
+                    operators.D(Dcoeff,symmatrix);
 
                 if (mesh1!=mesh2 && !mesh2.current_barrier())
-                    OpenMEEG::operatorDstar(mesh1,mesh2,symmatrix,Dcoeff,gauss_order);
-
-                // Computing N block
-
-                if (!disableBlock(mesh1,mesh2))
-                    OpenMEEG::operatorN(mesh1,mesh2,symmatrix,Ncoeff,gauss_order);
+                    operators.Dstar(Dcoeff,symmatrix);
             }
 
             // Deflate all current barriers as one
@@ -160,6 +159,55 @@ namespace OpenMEEG {
 
             return symmatrix;
         }
+
+        #if 0
+        SymmetricBlockMatrix HeadMatrixBlocks(const Geometry& geo,const unsigned gauss_order) {
+
+            SymMatrix symmatrix(geo.nb_parameters()-geo.nb_current_barrier_triangles());
+            //symmatrix.set(0.0);
+
+            // Iterate over pairs of communicating meshes (sharing a domains) to fill the
+            // lower half of the HeadMat (since it is symmetric).
+
+            for (const auto& mp : geo.communicating_mesh_pairs()) {
+                const Mesh& mesh1 = mp(0);
+                const Mesh& mesh2 = mp(1);
+
+                // Create the blocks corresponding to this pair of meshes. In the nested case, each line creates
+                // a single block. This is no longer the case in non-nested meshes.
+
+                symmatrix.add_blocks(Range(mesh1.triangles_range()),Range(mesh2.vertices_ranges())); // D and D* blocks.
+
+                const double factor = mp.relative_orientation()*K;
+
+                // Computing S block first because it is needed for the corresponding N block
+
+                if (!mesh1.current_barrier() && !mesh2.current_barrier() && !disableBlock(mesh1,mesh2)) {
+                    symmatrix.add_blocks(Range(mesh1.triangles_range()),Range(mesh2.triangles_range())); // S blocks.
+                    OpenMEEG::operatorS(mesh1,mesh2,symmatrix,factor,gauss_order);
+                }
+
+                if (!mesh1.current_barrier() && !disableBlock(mesh1,mesh2))
+                    OpenMEEG::operatorD(mesh1,mesh2,symmatrix,-factor,gauss_order);
+
+                if (mesh1!=mesh2 && !mesh2.current_barrier()) // Computing D* block
+                    OpenMEEG::operatorDstar(mesh1,mesh2,symmatrix,-factor,gauss_order);
+
+                // Computing N block
+
+                if (!disableBlock(mesh1,mesh2)) {
+                    symmatrix.add_blocks(Range(mesh1.vertices_ranges()),Range(mesh2.vertices_ranges())); // N blocks.
+                    OpenMEEG::operatorN(mesh1,mesh2,symmatrix,factor,gauss_order);
+                }
+            }
+
+            // Deflate all current barriers as one
+
+            deflate(symmatrix,geo);
+
+            return symmatrix;
+        }
+        #endif
     }
 
     SymMatrix conductivity_coefficients(const Geometry& geo) {
