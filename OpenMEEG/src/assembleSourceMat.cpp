@@ -75,7 +75,6 @@ namespace OpenMEEG {
         mat = Matrix((geo.nb_parameters()-geo.nb_current_barrier_triangles()),source_mesh.vertices().size());
         mat.set(0.0);
 
-        const double K  = 1.0/(4*Pi);
         const double L  = -1.0/domain.conductivity();
         for (const auto& boundary : domain.boundaries()) {
             const double factorN = (boundary.inside()) ? K : -K;
@@ -144,7 +143,6 @@ namespace OpenMEEG {
         // rhs = [0 ... 0  -D*_23  sigma_3^(-1)S_23  -I_33/2.+D*_33]
 
         const size_t n_sensors = electrodes.getNumberOfSensors();
-        const double K = 1.0/(4*Pi);
 
         SymMatrix transmat(geo.nb_parameters());
         transmat.set(0.0);
@@ -204,7 +202,7 @@ namespace OpenMEEG {
             const Vect3  q(dipoles(iDIP,3),dipoles(iDIP,4),dipoles(iDIP,5));
 
             const Domain& domain = (domain_name=="") ? geo.domain(r0) : geo.domain(domain_name);
-            const double  coeff  = 1.0/(4*Pi*domain.conductivity());
+            const double  coeff  = K/domain.conductivity();
 
             static analyticDipPot anaDP;
             anaDP.init(q,r0);
