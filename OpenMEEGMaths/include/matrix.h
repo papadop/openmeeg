@@ -151,11 +151,11 @@ namespace OpenMEEG {
 
         /// \brief Save Matrix to file (Format set using file name extension)
 
-        void save(const char *filename) const;
+        void save(const char* filename) const;
 
         /// \brief Load Matrix from file (Format set using file name extension)
 
-        void load(const char *filename);
+        void load(const char* filename);
 
         void save(const std::string& s) const { save(s.c_str()); }
         void load(const std::string& s)       { load(s.c_str()); }
@@ -168,6 +168,15 @@ namespace OpenMEEG {
         friend class SymMatrix;
     };
 
+    inline std::ostream& operator<<(std::ostream& os,const Matrix& M) {
+        for (unsigned i=0; i<M.nlin(); ++i) {
+            for (unsigned j=0; j<M.ncol(); ++j)
+                os << M(i,j) << ' ';
+            os << std::endl;
+        }
+        return os;
+    }
+
     inline double Matrix::operator()(size_t i,size_t j) const {
         om_assert(i<nlin() && j<ncol());
         return value[i+nlin()*j];
@@ -179,7 +188,7 @@ namespace OpenMEEG {
     
     inline double Matrix::frobenius_norm() const {
     #ifdef HAVE_LAPACK
-    if ( nlin()*ncol() != 0 ) {
+    if (nlin()*ncol()!=0) {
         double work;
         return DLANGE('F', sizet_to_int(nlin()), sizet_to_int(ncol()), data(), sizet_to_int(nlin()), &work);
     } else {
