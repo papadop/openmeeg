@@ -165,9 +165,8 @@ double normInf(const T& mat){ // compute the max of the norm 1 of each line
     double sum;
     for(unsigned int i=0;i<mat.nlin();++i){
         sum = 0.0;
-        for(unsigned int j=0;j<mat.ncol();++j) {
+        for(unsigned int j=0;j<mat.ncol();++j)
             sum += std::abs(mat(i,j));
-        }
         if (max<sum)
             max = sum;
     }
@@ -208,12 +207,12 @@ bool compare(const T& mat1, const T& mat2, double eps, size_t col){
     // T is a Matrix or a SymMatrix
 
     if (col) {
-        if ((mat1.ncol()<col) || (mat2.ncol()<col)) {
+        if (mat1.ncol()<col || mat2.ncol()<col) {
             std::cerr << "ERROR : Bad Column Id for matrices dimensions !" << std::endl;
             exit(1);
         }
     } else {
-        if ((mat1.ncol()!=mat2.ncol()) || (mat1.nlin()!=mat2.nlin())) {
+        if (mat1.ncol()!=mat2.ncol() || mat1.nlin()!=mat2.nlin()) {
             std::cerr << "ERROR : Dimension mismatch !" << std::endl;
             exit(1);
         }
@@ -235,59 +234,48 @@ bool compare(const T& mat1, const T& mat2, double eps, size_t col){
     double diff;
     unsigned count = 0;
 
-    if ((norm1>1e-4)&(norm2>1e-4)&(mat1.nlin()!=1)) {
-        for(unsigned int i=0;i<mat1.nlin();++i) {
-            for(unsigned int j=jmin;j<jmax;++j) {
-                diff = std::abs(mat1(i,j)/norm1 - mat2(i,j)/norm2);
+    if (norm1>1e-4 && norm2>1e-4 && mat1.nlin()!=1) {
+        for (unsigned int i=0; i<mat1.nlin(); ++i) {
+            for (unsigned int j=jmin; j<jmax; ++j) {
+                diff = std::abs(mat1(i,j)/norm1-mat2(i,j)/norm2);
                 flag = flag && (diff<eps);
-                if (!(diff<eps)&&(++count<100)) {
-                    if (count == 0)
+                if (diff>=eps && ++count<100) {
+                    if (count==0)
                         std::cout << "ERROR NORM  mat(i,j) | mat2(i,j) | diff" << std::endl;
                     std::cout.precision(20);
                     std::cout << "ERROR NORM  " << mat1(i,j) << "  " << mat2(i,j) << "  " << diff << std::endl;
                     std::cout.flush();
                 }
-                if ( count >= 100 ) {
-                    std::cout << "values from 1 to 100.... stopping display..." << std::endl;
-                    break;
+                if (count>=100) {
+                    std::cout << "More than 100 errors, stopping display..." << std::endl;
+                    return flag;
                 }
-            }
-            if ( count >= 100 ) {
-                break;
             }
         }
     } else {
-        for(unsigned int i=0;i<mat1.nlin();++i) {
-            for(unsigned int j=jmin;j<jmax;++j) {
+        for (unsigned int i=0;i<mat1.nlin();++i) {
+            for (unsigned int j=jmin;j<jmax;++j) {
                 if (std::abs(mat2(i,j))>1e-4) {
-                    diff = std::abs(mat1(i,j) - mat2(i,j))/std::abs(mat2(i,j));
+                    diff = std::abs(mat1(i,j)-mat2(i,j))/std::abs(mat2(i,j));
                     flag = flag && (diff<eps);
-                    if (!(diff<eps)&&(++count<100)) {
+                    if (diff>=eps && ++count<100) {
                         std::cout.precision(20);
                         std::cout << "ERROR RELATIVE  " << mat1(i,j) << "  " << mat2(i,j) << "  " << diff << std::endl;
                         std::cout.flush();
                     }
-                    if ( count >= 100 ) {
-                        std::cout << "values from 1 to 100.... stopping display..." << std::endl;
-                        break;
-                    }
-                }
-                else {
-                    diff = std::abs(mat1(i,j) - mat2(i,j));
+                } else {
+                    diff = std::abs(mat1(i,j)-mat2(i,j));
                     flag = flag && (diff<eps);
-                    if (!(diff<eps)&&(++count<100)) {
+                    if (diff>=eps && ++count<100) {
                         std::cout.precision(20);
                         std::cout << "ERROR DIFF  " << mat1(i,j) << "  " << mat2(i,j) << "  " << diff << std::endl;
                         std::cout.flush();
                     }
-                    if ( count >= 100 ) {
-                        std::cout << "values from 1 to 100. Stopping the display..." << std::endl;
-                        break;
-                    }
                 }
-            }
-            if ( count >= 100 ) {
-                break;
+                if (count>=100) {
+                    std::cout << "More than 100 errors, stopping display..." << std::endl;
+                    return flag;
+                }
             }
         }
     }
