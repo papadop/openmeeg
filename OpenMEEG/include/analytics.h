@@ -129,10 +129,16 @@ namespace OpenMEEG {
     };
 
     class OPENMEEG_EXPORT analyticD3 {
+
+        static Vect3 unit_vector(const Vect3& V) { return V/V.norm(); }
+
+        Vect3 diff(const unsigned i,const unsigned j) const { return triangle.vertex(i)-triangle.vertex(j); }
+
     public:
 
-         analyticD3(const Triangle& T): v1(T.vertex(0)),v2(T.vertex(1)),v3(T.vertex(2)) {}
-        ~analyticD3() { }
+        analyticD3(const Triangle& T):
+            triangle(T),D1(diff(1,0)),D2(diff(2,1)),D3(diff(0,2)),U1(unit_vector(D1)),U2(unit_vector(D2)),U3(unit_vector(D3))
+        { }
 
         inline Vect3 f(const Vect3& x) const {
             //Analytical value of the inner integral in operator D. See DeMunck article for further details.
@@ -142,9 +148,9 @@ namespace OpenMEEG {
 
             //  First part omega is just x.solid_angle(v1,v2,v3)
 
-            const Vect3& Y1 = v1-x;
-            const Vect3& Y2 = v2-x;
-            const Vect3& Y3 = v3-x;
+            const Vect3& Y1 = triangle.vertex(0)-x;
+            const Vect3& Y2 = triangle.vertex(1)-x;
+            const Vect3& Y3 = triangle.vertex(2)-x;
             const double y1 = Y1.norm();
             const double y2 = Y2.norm();
             const double y3 = Y3.norm();
@@ -158,25 +164,25 @@ namespace OpenMEEG {
             const Vect3& Z1 = crossprod(Y2,Y3);
             const Vect3& Z2 = crossprod(Y3,Y1);
             const Vect3& Z3 = crossprod(Y1,Y2);
-            const Vect3& D1 = v2-v1;
-            const Vect3& D2 = v3-v2;
-            const Vect3& D3 = v1-v3;
-            const double d1 = D1.norm();
-            const double d2 = D2.norm();
-            const double d3 = D3.norm();
-            const double g1 = log((y2*d1+dotprod(Y2,D1))/(y1*d1+dotprod(Y1,D1)))/d1;
-            const double g2 = log((y3*d2+dotprod(Y3,D2))/(y2*d2+dotprod(Y2,D2)))/d2;
-            const double g3 = log((y1*d3+dotprod(Y1,D3))/(y3*d3+dotprod(Y3,D3)))/d3;
+            const double g1 = log((y2+dotprod(Y2,U1))/(y1+dotprod(Y1,U1)));
+            const double g2 = log((y3+dotprod(Y3,U2))/(y2+dotprod(Y2,U2)));
+            const double g3 = log((y1+dotprod(Y1,U3))/(y3+dotprod(Y3,U3)));
             const Vect3& N = Z1+Z2+Z3;
             const double invA = 1.0/N.norm2();
-            const Vect3& S = D1*g1+D2*g2+D3*g3;
+            const Vect3& S = U1*g1+U2*g2+U3*g3;
 
             return invA*(omega*Vect3(dotprod(Z1,N),dotprod(Z2,N),dotprod(Z3,N))+d*Vect3(dotprod(D2,S),dotprod(D3,S),dotprod(D1,S)));
         }
 
     private:
 
-        const Vect3 &v1, &v2, &v3;
+        const Triangle& triangle;
+        const Vect3     D1;
+        const Vect3     D2;
+        const Vect3     D3;
+        const Vect3     U1;
+        const Vect3     U2;
+        const Vect3     U3;
     };
 
     class OPENMEEG_EXPORT analyticDipPot {
