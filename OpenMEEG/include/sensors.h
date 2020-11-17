@@ -136,30 +136,46 @@ namespace OpenMEEG {
             init_labels(labels);
         }
 
-        void load(const char* filename,const char filetype='t' ); /*!< Load sensors from file. Filetype is 't' for text file or 'b' for binary file. */
+        /// Load sensors from file. Filetype is 't' for text file or 'b' for binary file.
+
+        void load(const char* filename,const char filetype='t');
         void load(const std::string& filename,const char filetype='t') { load(filename.c_str(),filetype); }
-        void load(std::istream &in); /*!< Load description file of sensors from stream. */
+
+        /// Load description file of sensors from stream. 
+
+        void load(std::istream& in);
 
         void save(const char* filename) const;
         void save(const std::string& filename) const { save(filename.c_str()); }
 
-        size_t getNumberOfSensors()   const { return m_nb; } /*!< Return the number of sensors. */
-        size_t getNumberOfPositions() const { return m_positions.nlin(); } /*!< Return the number of integration points. */
+        /// Return the number of sensors.
 
-        Matrix& getPositions() { return m_positions ; } /*!< Return a reference on sensors positions. */
-        Matrix getPositions() const { return m_positions ; } /*!< Return a copy of sensors positions */
+        size_t getNumberOfSensors()   const { return m_nb; }
 
-        Matrix& getOrientations() { return m_orientations ; } /*!< Return a reference on sensors orientations. */
-        Matrix getOrientations() const { return m_orientations ; } /*!< Return a copy of sensors orientations. */
+        /// Return the number of integration points.
 
-        Strings& getNames() { return m_names ; } /*!< Return a reference on sensors names. */
-        Strings  getNames() const { return m_names ; } /*!< Return a copy of sensors names. */
+        size_t getNumberOfPositions() const { return m_positions.nlin(); }
 
-        bool hasRadii() const { return m_radii.nlin() > 0 ;} /*!< Return true if contains radii */
-        bool hasOrientations() const { return m_orientations.nlin() > 0 ;} /*!< Return true if contains orientations */
-        bool hasNames() const { return m_names.size() == m_nb ;} /*!< Return true if contains all sensors names */
+        /// Return sensors positions.
 
-        ///! Return the position (3D point) of the integration point idx.
+              Matrix& getPositions()       { return m_positions; }
+        const Matrix& getPositions() const { return m_positions; }
+
+        /// Return sensors orientations.
+
+              Matrix& getOrientations()       { return m_orientations; }
+        const Matrix& getOrientations() const { return m_orientations; }
+
+        /// Return sensors names.
+
+        Strings& getNames()       { return m_names; }
+        Strings  getNames() const { return m_names; }
+
+        bool hasRadii()        const { return m_radii.nlin()>0;        } ///< Return true if contains radii.
+        bool hasOrientations() const { return m_orientations.nlin()>0; } ///< Return true if contains orientations.
+        bool hasNames()        const { return m_names.size()==m_nb;    } ///< Return true if contains all sensors names.
+
+        /// Return the position (3D point) of the integration point idx.
 
         Vector getPosition(const size_t idx) const { return m_positions.getlin(idx); }
 
@@ -167,7 +183,12 @@ namespace OpenMEEG {
 
         Vector getOrientation(const size_t idx) const { return m_orientations.getlin(idx); }
 
-        std::string getName(size_t idx) const{ om_assert(idx < m_names.size()); return m_names[idx]; } /*!< Return the name of the idx_th sensor */
+        /// Return the name of the idx_th sensor.
+
+        std::string getName(const size_t idx) const {
+            om_assert(idx<m_names.size());
+            return m_names[idx];
+        }
 
         /// Set the position (3D point) of the integration point i.
 
