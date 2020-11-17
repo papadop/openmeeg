@@ -118,10 +118,10 @@ namespace OpenMEEG {
         }
     }
 
-    class SingleMeshBlocks {
+    class DiagonalBlock {
     public:
 
-        SingleMeshBlocks(const Mesh& m): mesh(m) { }
+        DiagonalBlock(const Mesh& m): mesh(m) { }
 
         template <typename T>
         void addId(const double& coeff,T& mat) const {

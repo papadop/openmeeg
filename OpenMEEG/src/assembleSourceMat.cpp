@@ -155,11 +155,11 @@ namespace OpenMEEG {
             if (mesh1.current_barrier()) {
                 const Operators operators(mesh1,mesh2,gauss_order);
                 const int orientation = geo.oriented(mesh1,mesh2);
-                operators.D(K*orientation,transmat);
-                if (&mesh1==&mesh2) { // I_33
-                    SingleMeshBlocks block(mesh1);
+                operators.D(K*orientation,transmat); // D23 or D33 of the formula.
+                if (&mesh1==&mesh2) { // I_33 of the formual.
+                    DiagonalBlock block(mesh1);
                     block.addId(-0.5*orientation,transmat);
-                } else { // S_23
+                } else { // S_2 of the formual.3
                     operators.S(-K*orientation*geo.sigma_inv(mesh1,mesh2),transmat);
                 }
             }
