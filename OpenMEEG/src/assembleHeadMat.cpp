@@ -367,33 +367,34 @@ namespace OpenMEEG {
 
         std::map<const Domain*,Vertices> m_points;
         unsigned index = 0;
-        for (unsigned i=0;i<points.nlin();++i) {
-            const Domain& domain = geo.domain(Vect3(points(i,0),points(i,1),points(i,2))); // TODO: see Vertex below....
+        for (unsigned i=0; i<points.nlin(); ++i) {
+            const Vect3 point(points(i,0),points(i,1),points(i,2));
+            const Domain& domain = geo.domain(point);
             if (domain.conductivity()==0.0) {
-                std::cerr << " Surf2Vol: Point [ " << points.getlin(i);
-                std::cerr << "] is inside a non-conductive domain. Point is dropped." << std::endl;
+                std::cerr << " Surf2Vol: Point [ " << points.getlin(i) << "]"
+                          << " is inside a non-conductive domain. Point is dropped." << std::endl;
             } else {
-                m_points[&domain].push_back(Vertex(points(i,0), points(i,1),points(i,2),index++));
+                m_points[&domain].push_back(Vertex(point,index++));
             }
         }
 
+        // At this point index is the total number of inside points.
+
+        const unsigned size = index; // total number of inside points
+
         Matrix& mat = *this;
-
-        unsigned size = 0; // total number of inside points
-        for (const auto& map_element : m_points)
-            size += map_element.second.size();
-
         mat = Matrix(size,(geo.nb_parameters()-geo.nb_current_barrier_triangles()));
         mat.set(0.0);
 
-        for (const auto& map_element : m_points)
-            for (const auto& mesh : geo.meshes()) {
-                const int orientation = map_element.first->mesh_orientation(mesh);
-                if (orientation!=0) {
-                    operatorDinternal(mesh,mat,map_element.second,-orientation*K);
+        for (const auto& [domainptr,pts] : m_points) {
+            for (const auto& boundary : domainptr->boundaries())
+                for (const auto& omesh : boundary.interface().oriented_meshes()) {
+                    const Mesh& mesh = omesh.mesh();
+                    const double coeff = boundary.mesh_orientation(omesh)*K;
+                    operatorDinternal(mesh,mat,pts,-coeff);
                     if (!mesh.current_barrier())
-                        operatorSinternal(mesh,mat,map_element.second,orientation*K/map_element.first->conductivity());
+                        operatorSinternal(mesh,mat,pts,coeff/domainptr->conductivity());
                 }
-            }
+        }
     }
 }
