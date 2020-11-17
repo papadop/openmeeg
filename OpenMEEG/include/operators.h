@@ -116,14 +116,30 @@ namespace OpenMEEG {
 
             return result;
         }
-
-        inline double operatorP1P0(const Triangle& T2,const Vertex& V1) {
-            double result = 0.;
-            if  (T2.contains(V1))
-                result = T2.area()/3.0;
-            return result;
-        }
     }
+
+    class SingleMeshBlocks {
+    public:
+
+        SingleMeshBlocks(const Mesh& m): mesh(m) { }
+
+        template <typename T>
+        void addId(const double& coeff,T& mat) const {
+            // The Matrix is incremented by the identity P1P0 operator
+            std::cout << "OPERATOR P1P0... (arg : mesh " << mesh.name() << " )" << std::endl;
+            for (const auto& triangle : mesh.triangles())
+                for (const auto& vertex : triangle)
+                    mat(triangle.index(),vertex->index()) += Id(triangle,*vertex)*coeff;
+        }
+
+    private:
+
+        static double Id(const Triangle& T,const Vertex& V) {
+            return (T.contains(V)) ? T.area()/3.0 : 0.0;
+        }
+
+        const Mesh& mesh;
+    };
 
     template <bool VERBOSE=true>
     class Operators {
@@ -426,13 +442,4 @@ namespace OpenMEEG {
         const unsigned gauss_order;
         const bool     same_mesh;
     };
-
-    template <typename T>
-    void operatorP1P0(const Mesh& m,T& mat,const double& coeff) {
-        // This time mat(i, j)+= ... the Matrix is incremented by the P1P0 operator
-        std::cout << "OPERATOR P1P0... (arg : mesh " << m.name() << " )" << std::endl;
-        for (const auto& triangle : m.triangles())
-            for (const auto& vertex : triangle)
-                mat(triangle.index(),vertex->index()) += Details::operatorP1P0(triangle,*vertex)*coeff;
-    }
 }

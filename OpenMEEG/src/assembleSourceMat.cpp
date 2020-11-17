@@ -146,6 +146,7 @@ namespace OpenMEEG {
         transmat.set(0.0);
 
         // This is an overkill. Can we limit the computation only to injection triangles ?
+        // We use only the few lines that correspond to injection triangles.
 
         for (const auto& mp : geo.communicating_mesh_pairs()) {
             const Mesh& mesh1 = mp(0);
@@ -156,7 +157,8 @@ namespace OpenMEEG {
                 const int orientation = geo.oriented(mesh1,mesh2);
                 operators.D(K*orientation,transmat);
                 if (&mesh1==&mesh2) { // I_33
-                    operatorP1P0(mesh1,transmat,-0.5*orientation);
+                    SingleMeshBlocks block(mesh1);
+                    block.addId(-0.5*orientation,transmat);
                 } else { // S_23
                     operators.S(-K*orientation*geo.sigma_inv(mesh1,mesh2),transmat);
                 }
