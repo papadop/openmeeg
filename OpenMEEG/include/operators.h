@@ -60,8 +60,6 @@ namespace OpenMEEG {
 
     // TODO: Use overloading and remove the internal suffix.
 
-    void operatorSinternal(const Mesh&,Matrix&,const Vertices&,const double&);
-    void operatorDinternal(const Mesh&,Matrix&,const Vertices&,const double&);
     void operatorFerguson(const Vect3&,const Mesh&,Matrix&,const unsigned&,const double&);
     void operatorDipolePotDer(const Vect3&,const Vect3&,const Mesh&,Vector&,const double&,const unsigned,const bool);
     void operatorDipolePot(const Vect3&,const Vect3&,const Mesh&,Vector&,const double&,const unsigned,const bool);
@@ -106,7 +104,7 @@ namespace OpenMEEG {
                 // A, B are the two opposite vertices to V (triangle A, B, V)
                 const Vertex& A = edge.vertex(0);
                 const Vertex& B = edge.vertex(1);
-                const Vect3 AB = (A-B)*(0.5/T.area());
+                const Vect3 AB = (A-B)/(2*T.area());
                 
                 analyticS analyS(V,A,B);
                 const double opS = analyS.f(x);
@@ -124,12 +122,12 @@ namespace OpenMEEG {
         DiagonalBlock(const Mesh& m): mesh(m) { }
 
         template <typename T>
-        void addId(const double& coeff,T& mat) const {
+        void addId(const double& coeff,T& matrix) const {
             // The Matrix is incremented by the identity P1P0 operator
             std::cout << "OPERATOR P1P0... (arg : mesh " << mesh.name() << " )" << std::endl;
             for (const auto& triangle : mesh.triangles())
                 for (const auto& vertex : triangle)
-                    mat(triangle.index(),vertex->index()) += Id(triangle,*vertex)*coeff;
+                    matrix(triangle.index(),vertex->index()) += Id(triangle,*vertex)*coeff;
         }
 
     private:
@@ -137,6 +135,38 @@ namespace OpenMEEG {
         static double Id(const Triangle& T,const Vertex& V) {
             return (T.contains(V)) ? T.area()/3.0 : 0.0;
         }
+
+        const Mesh& mesh;
+    };
+
+    class PartialBlock {
+    public:
+
+        PartialBlock(const Mesh& m): mesh(m) { }
+
+        void addD(const double& coeff,const Vertices& points,Matrix& matrix) const {
+            std::cout << "PARTAL OPERATOR D..." << std::endl;
+            for (const auto& triangle : mesh.triangles()) {
+                analyticD3 analyD(triangle);
+                for (const auto& vertex : points) {
+                    const Vect3& integrals = analyD.f(vertex);
+                    for (unsigned i=0;i<3;++i)
+                        matrix(vertex.index(),triangle.vertex(i).index()) += integrals(i)*coeff;
+                }
+            }
+        }
+
+        void S(const double& coeff,const Vertices& points,Matrix& matrix) const {
+            std::cout << "PARTIAL OPERATOR S..." << std::endl;
+            for (const auto& triangle : mesh.triangles()) {
+                const analyticS analyS(triangle);
+                for (const auto& vertex : points)
+                    matrix(vertex.index(),triangle.index()) = coeff*analyS.f(vertex);
+            }
+        }
+
+
+    private:
 
         const Mesh& mesh;
     };

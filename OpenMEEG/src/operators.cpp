@@ -41,31 +41,6 @@ knowledge of the CeCILL-B license and that you accept its terms.
 
 namespace OpenMEEG {
 
-    // TODO: Use overloading and remove the internal suffix.
-
-    void operatorDinternal(const Mesh& m,Matrix& mat,const Vertices& points,const double& coeff) {
-        std::cout << "INTERNAL OPERATOR D..." << std::endl;
-        for (const auto& vertex : points)
-            for (const auto& triangle : m.triangles()) {
-                analyticD3 analyD(triangle);
-                const Vect3 total = analyD.f(vertex);
-                for (unsigned i=0;i<3;++i)
-                    mat(vertex.index(),triangle.vertex(i).index()) += total(i)*coeff;
-            }
-    }
-
-    void operatorSinternal(const Mesh& m,Matrix& mat,const Vertices& points,const double& coeff) {
-        std::cout << "INTERNAL OPERATOR S..." << std::endl;
-        for (const auto& vertex : points) {
-            const unsigned vindex = vertex.index();
-            for (const auto& triangle : m.triangles()) {
-                const unsigned tindex = triangle.index();
-                const analyticS analyS(triangle);
-                mat(vindex,tindex) = coeff*analyS.f(vertex);
-            }
-        }
-    }
-
     // General routine for applying Details::operatorFerguson (see this function for further comments)
     // to an entire mesh, and storing coordinates of the output in a Matrix.
 

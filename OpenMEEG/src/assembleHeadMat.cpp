@@ -364,6 +364,7 @@ namespace OpenMEEG {
     Surf2VolMat::Surf2VolMat(const Geometry& geo,const Matrix& points) {
 
         // Find the points per domain and generate the indices for the m_points
+        // What happens if a point is on the boundary of a domain ? TODO
 
         std::map<const Domain*,Vertices> m_points;
         unsigned index = 0;
@@ -390,10 +391,11 @@ namespace OpenMEEG {
             for (const auto& boundary : domainptr->boundaries())
                 for (const auto& omesh : boundary.interface().oriented_meshes()) {
                     const Mesh& mesh = omesh.mesh();
+                    const PartialBlock block(mesh);
                     const double coeff = boundary.mesh_orientation(omesh)*K;
-                    operatorDinternal(mesh,mat,pts,-coeff);
+                    block.addD(-coeff,pts,mat);
                     if (!mesh.current_barrier())
-                        operatorSinternal(mesh,mat,pts,coeff/domainptr->conductivity());
+                        block.S(coeff/domainptr->conductivity(),pts,mat);
                 }
         }
     }
