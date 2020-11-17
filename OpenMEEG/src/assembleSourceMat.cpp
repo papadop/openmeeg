@@ -137,41 +137,43 @@ namespace OpenMEEG {
 
     EITSourceMat::EITSourceMat(const Geometry& geo,const Sensors& electrodes,const unsigned gauss_order) {
 
-        // Matrix to be applied to the scalp-injected current to obtain the Source Term of the EIT foward problem.
+        // Matrix to be applied to the scalp-injected current to obtain the source term of the EIT foward problem,
         // following article BOUNDARY ELEMENT FORMULATION FOR ELECTRICAL IMPEDANCE TOMOGRAPHY
         // (eq.14 (do not look at eq.16 since there is a mistake: D_23 -> S_23))
         // rhs = [0 ... 0  -D*_23  sigma_3^(-1)S_23  -I_33/2.+D*_33]
 
-        const size_t n_sensors = electrodes.getNumberOfSensors();
-
         SymMatrix transmat(geo.nb_parameters());
         transmat.set(0.0);
 
-        for (const auto& mesh1 : geo.meshes())
-            if (mesh1.current_barrier())
-                for (const auto& mesh2 : geo.meshes()) {
-                    const Operators operators(mesh1,mesh2,gauss_order);
-                    const int orientation = geo.oriented(mesh1,mesh2);
-                    if (orientation!=0){ // D*_23 or D*_33
-                        operators.D(K*orientation,transmat);
-                        if (mesh1==mesh2) { // I_33
-                            operatorP1P0(mesh1,transmat,-0.5*orientation);
-                        } else { // S_23
-                            operators.S(geo.sigma_inv(mesh1,mesh2)*(-1.0*K*orientation),transmat);
-                        }
-                    }
-                }
+        // This is an overkill. Can we limit the computation only to injection triangles ?
 
+        for (const auto& mp : geo.communicating_mesh_pairs()) {
+            const Mesh& mesh1 = mp(0);
+            const Mesh& mesh2 = mp(1);
+
+            if (mesh1.current_barrier()) {
+                const Operators operators(mesh1,mesh2,gauss_order);
+                const int orientation = geo.oriented(mesh1,mesh2);
+                operators.D(K*orientation,transmat);
+                if (&mesh1==&mesh2) { // I_33
+                    operatorP1P0(mesh1,transmat,-0.5*orientation);
+                } else { // S_23
+                    operators.S(-K*orientation*geo.sigma_inv(mesh1,mesh2),transmat);
+                }
+            }
+        }
+
+        const size_t n_sensors = electrodes.getNumberOfSensors();
         Matrix& mat = *this;
-        mat = Matrix((geo.nb_parameters()-geo.nb_current_barrier_triangles()), n_sensors);
+        mat = Matrix((geo.nb_parameters()-geo.nb_current_barrier_triangles()),n_sensors);
         mat.set(0.0);
 
         for (size_t ielec=0; ielec<n_sensors; ++ielec)
             for (const auto& triangle : electrodes.getInjectionTriangles(ielec)) {
                 // To ensure exactly no accumulation of currents. w = electrode_area/triangle_area (~= 1)
                 // If no radius is given, we assume the user wants to specify an intensity not a density of current.
-                const double coeff = (almost_equal(electrodes.getRadii()(ielec),0.)) ? 1.0/triangle.area() : electrodes.getWeights()(ielec);
-                for (size_t i=0; i<(geo.nb_parameters()-geo.nb_current_barrier_triangles()); ++i)
+                const double coeff = (almost_equal(electrodes.getRadii()(ielec),0.0)) ? 1.0/triangle.area() : electrodes.getWeights()(ielec);
+                for (size_t i=0; i<mat.nlin(); ++i)
                     mat(i,ielec) += transmat(triangle.index(),i)*coeff;
             }
     }

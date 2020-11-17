@@ -64,8 +64,8 @@ namespace OpenMEEG {
             const Vect3 current_position(positions(i,0),positions(i,1),positions(i,2));
             double dist;
             Vect3 current_alphas;
-            Triangle current_triangle;
-            dist_point_geom(current_position,geo,current_alphas,current_triangle,dist);
+            const auto& res = dist_point_geom(current_position,geo,current_alphas);
+            const Triangle& current_triangle = std::get<1>(res);
             for (unsigned j=0;j<3;++j)
                 mat(i,current_triangle.vertex(j).index()) = current_alphas(j);
         }
@@ -88,8 +88,8 @@ namespace OpenMEEG {
             for (unsigned k=0;k<3;++k)
                 current_position(k) = positions(it,k);
             Vect3 current_alphas;
-            Triangle current_triangle;
-            dist_point_interface(current_position,i,current_alphas,current_triangle);
+            const auto& res = dist_point_interface(current_position,i,current_alphas);
+            const Triangle& current_triangle = std::get<1>(res);
             for (unsigned j=0;j<3;++j)
                 mat(it,current_triangle.vertex(j).index()) = current_alphas(j);
         }

@@ -202,17 +202,16 @@ namespace OpenMEEG {
     void Sensors::findInjectionTriangles() {
         om_error(geometry!=NULL);
         m_weights = Vector(m_positions.nlin());
-        m_weights.set(1.);
+        m_weights.set(1.0);
         Strings ci_mesh_names;
         std::vector<size_t> ci_triangles; // Count of the number of points that have been mapped to each mesh.
 
         for (size_t idx=0; idx<m_positions.nlin(); ++idx) {
             const Vect3 current_position(m_positions(idx,0),m_positions(idx,1),m_positions(idx,2));
             Vect3 current_alphas; //not used here
-            Triangle current_nearest_triangle; // to hold the closest triangle to electrode.
 
-            double dist;
-            const std::string& s_map = dist_point_geom(current_position,*geometry,current_alphas,current_nearest_triangle,dist);
+            const auto& res = dist_point_geom(current_position,*geometry,current_alphas);
+            const std::string& s_map = std::get<3>(res).name();
             const Strings::iterator sit = std::find(ci_mesh_names.begin(),ci_mesh_names.end(),s_map);
             if (sit!=ci_mesh_names.end()){
                 const size_t idx2 = std::distance(ci_mesh_names.begin(),sit);
@@ -223,16 +222,17 @@ namespace OpenMEEG {
             }
 
             Triangles triangles;
+            const Triangle& current_nearest_triangle = std::get<1>(res);
             triangles.push_back(current_nearest_triangle);
             std::set<size_t> index_seen; // to avoid infinite looping
             index_seen.insert(current_nearest_triangle.index());
             if (!almost_equal(m_radii(idx),0.)) {
                 // if the electrode is larger than the triangle, look for adjacent triangles
                 if (current_nearest_triangle.area()<4*Pi*sqr(m_radii(idx))) {
-                    std::stack<Triangle *> tri_stack;
+                    std::stack<const Triangle*> tri_stack;
                     tri_stack.push(&current_nearest_triangle);
                     while (!tri_stack.empty()) {
-                        Triangle* t = tri_stack.top();
+                        const Triangle* t = tri_stack.top();
                         tri_stack.pop();
                         if ((t->center()-current_position).norm()<m_radii(idx)) {
                             if (t->index()!=current_nearest_triangle.index()) //don't push the nearest triangle twice
