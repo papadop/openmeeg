@@ -69,9 +69,8 @@ namespace OpenMEEG {
 
         template <template <typename,typename> class Integrator>
         void operatorDipolePot(const Vect3& r0,const Vect3& q,const Mesh& m,Vector& rhs,const double& coeff,const unsigned gauss_order) {
-            static analyticDipPot anaDP;
+            analyticDipPot anaDP(r0,q);
 
-            anaDP.init(q,r0);
             Integrator<double,analyticDipPot> gauss(0.001);
             gauss->setOrder(gauss_order);
 
@@ -374,7 +373,7 @@ namespace OpenMEEG {
         void addD(const double& coeff,const Vertices& points,Matrix& matrix) const {
             std::cout << "PARTAL OPERATOR D..." << std::endl;
             for (const auto& triangle : mesh.triangles()) {
-                analyticD3 analyD(triangle);
+                const analyticD3 analyD(triangle);
                 for (const auto& vertex : points) {
                     const Vect3& integrals = analyD.f(vertex);
                     for (unsigned i=0;i<3;++i)

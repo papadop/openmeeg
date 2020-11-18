@@ -64,13 +64,11 @@ namespace OpenMEEG {
     }
 
     void operatorDipolePotDer(const Vect3& r0,const Vect3& q,const Mesh& m,Vector& rhs,const double& coeff,const unsigned gauss_order,const bool adapt_rhs) {
-        static analyticDipPotDer anaDPD;
-
         Integrator<Vect3,analyticDipPotDer>* gauss = (adapt_rhs) ? new AdaptiveIntegrator<Vect3,analyticDipPotDer>(0.001) :
                                                                    new Integrator<Vect3,analyticDipPotDer>;
 
         gauss->setOrder(gauss_order);
-        #pragma omp parallel for private(anaDPD)
+        #pragma omp parallel for
         #if defined NO_OPENMP || defined OPENMP_RANGEFOR
         for (const auto& triangle : m.triangles()) {
         #elif defined OPENMP_ITERATOR
@@ -80,8 +78,9 @@ namespace OpenMEEG {
         for (int i=0;i<m.triangles().size();++i) {
             const Triangle& triangle = *(m.triangles().begin()+i);
         #endif
-            anaDPD.init(triangle,q,r0);
-            Vect3 v = gauss->integrate(anaDPD,triangle);
+            const analyticDipPotDer anaDPD(r0,q,triangle);
+
+            const Vect3& v = gauss->integrate(anaDPD,triangle);
             #pragma omp critical
             {
                 for (unsigned i=0;i<3;++i)
@@ -92,9 +91,8 @@ namespace OpenMEEG {
     }
 
     void operatorDipolePot(const Vect3& r0,const Vect3& q,const Mesh& m,Vector& rhs,const double& coeff,const unsigned gauss_order,const bool adapt_rhs) {
-        static analyticDipPot anaDP;
+        const analyticDipPot anaDP(r0,q);
 
-        anaDP.init(q,r0);
         Integrator<double,analyticDipPot>* gauss = (adapt_rhs) ? new AdaptiveIntegrator<double,analyticDipPot>(0.001) :
                                                                  new Integrator<double,analyticDipPot>;
         gauss->setOrder(gauss_order);
@@ -110,7 +108,6 @@ namespace OpenMEEG {
             const Triangle& triangle = *(m.triangles().begin()+i);
         #endif
             const double d = gauss->integrate(anaDP,triangle);
-            #pragma omp critical
             rhs(triangle.index()) += d*coeff;
         }
         delete gauss;

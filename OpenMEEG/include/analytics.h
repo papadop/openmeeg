@@ -98,8 +98,6 @@ namespace OpenMEEG {
             finish_intialization();
         }
 
-        ~analyticS() { }
-
         double f(const Vect3& x) const {
             // analytical value of the internal integral of S operator at point X
             const Vect3& p0x = p0-x;
@@ -141,10 +139,9 @@ namespace OpenMEEG {
         { }
 
         inline Vect3 f(const Vect3& x) const {
-            //Analytical value of the inner integral in operator D. See DeMunck article for further details.
-            //  for non-optimized version of operator D
-            //  returns in a vector, the inner integrals of operator D on a triangle viewed as a part of the 3
-            //  P1 functions it has a part in.
+            // Analytical value of the inner integral in operator D. See DeMunck article for further details.
+            // Used in non-optimized version of operator D.
+            // Returns a vector of the inner integrals of operator D on a triangle wrt its three P1 functions.
 
             //  First part omega is just x.solid_angle(v1,v2,v3)
 
@@ -171,7 +168,7 @@ namespace OpenMEEG {
             const double invA = 1.0/N.norm2();
             const Vect3& S = U1*g1+U2*g2+U3*g3;
 
-            return invA*(omega*Vect3(dotprod(Z1,N),dotprod(Z2,N),dotprod(Z3,N))+d*Vect3(dotprod(D2,S),dotprod(D3,S),dotprod(D1,S)));
+            return (omega*Vect3(dotprod(Z1,N),dotprod(Z2,N),dotprod(Z3,N))+d*Vect3(dotprod(D2,S),dotprod(D3,S),dotprod(D1,S)))/N.norm2();
         }
 
     private:
@@ -188,16 +185,12 @@ namespace OpenMEEG {
     class OPENMEEG_EXPORT analyticDipPot {
     public:
 
-         analyticDipPot(){}
-        ~analyticDipPot(){}
+        analyticDipPot(const Vect3& pos,const Vect3& moment): r0(pos),q(moment) { }
 
-        inline void init( const Vect3& _q, const Vect3& _r0) {
-            q = _q;
-            r0 = _r0;
-        }
+        double f(const Vect3& x) const {
 
-        inline double f(const Vect3& x) const {
-            // RK: A = q.(x-r0)/||x-r0||^3
+            // V = q.(x-r0)/||x-r0||^3
+
             const Vect3& r = x-r0;
             const double rn2 = r.norm2();
             return dotprod(q,r)/(rn2*sqrt(rn2));
@@ -205,19 +198,14 @@ namespace OpenMEEG {
 
     private:
 
-        Vect3 r0;
-        Vect3 q;
+        const Vect3& r0;
+        const Vect3& q;
     };
 
     class OPENMEEG_EXPORT analyticDipPotDer {
     public:
 
-         analyticDipPotDer(){}
-        ~analyticDipPotDer(){}
-
-        void init( const Triangle& T, const Vect3 &_q, const Vect3& _r0) {
-            q = _q;
-            r0 = _r0;
+        analyticDipPotDer(const Vect3& pos,const Vect3& moment,const Triangle& T): r0(pos),q(moment) {
 
             const Vect3& p0 = T.vertex(0);
             const Vect3& p1 = T.vertex(1);
@@ -250,7 +238,8 @@ namespace OpenMEEG {
         Vect3 f(const Vect3& x) const {
             Vect3 P1part(dotprod(H0p0DivNorm2,x-H0),dotprod(H1p1DivNorm2,x-H1),dotprod(H2p2DivNorm2,x-H2));
 
-            // RK: B = n.grad_x(A) with grad_x(A)= q/||^3 - 3r(q.r)/||^5
+            // B = n.grad_x(A) with grad_x(A)= q/||^3 - 3r(q.r)/||^5
+
             const Vect3& r   = x-r0;
             const double rn2 = r.norm2();
             const double EMpart = dotprod(n,q-3*dotprod(q,r)*r/rn2)/(rn2*sqrt(rn2));
@@ -260,7 +249,9 @@ namespace OpenMEEG {
 
     private:
 
-        Vect3 q, r0;
+        const Vect3& r0;
+        const Vect3& q;
+
         Vect3 H0, H1, H2;
         Vect3 H0p0DivNorm2, H1p1DivNorm2, H2p2DivNorm2, n;
     };

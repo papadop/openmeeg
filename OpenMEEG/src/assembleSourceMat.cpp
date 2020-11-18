@@ -154,7 +154,7 @@ namespace OpenMEEG {
 
             if (mesh1.current_barrier()) {
                 const NonDiagonalBlock operators(mesh1,mesh2,gauss_order);
-                const double orientation = geo.oriented(mesh1,mesh2);
+                const int orientation = geo.oriented(mesh1,mesh2);
                 operators.D(K*orientation,transmat); // D23 or D33 of the formula.
                 if (&mesh1==&mesh2) { // I_33 of the formula.
                     DiagonalBlock block(mesh1,gauss_order);
@@ -208,8 +208,7 @@ namespace OpenMEEG {
             const Domain& domain = (domain_name=="") ? geo.domain(r0) : geo.domain(domain_name);
             const double  coeff  = K/domain.conductivity();
 
-            static analyticDipPot anaDP;
-            anaDP.init(q,r0);
+            const analyticDipPot anaDP(r0,q);
             for (unsigned iPTS=0; iPTS<pts.size(); ++iPTS)
                 if (points_domain[iPTS]==&domain)
                     mat(iPTS,iDIP) += coeff*anaDP.f(pts[iPTS]);
