@@ -81,11 +81,11 @@ namespace OpenMEEG {
             for (const auto& oriented_mesh : boundary.interface().oriented_meshes()) {
                 const Mesh& mesh = oriented_mesh.mesh();
 
-                Operators operators(mesh,source_mesh,gauss_order);
+                NonDiagonalBlock operators(mesh,source_mesh,gauss_order);
 
                 // First block is nVertexFistLayer*source_mesh.vertices().size()
                 const double coeffN = factorN*oriented_mesh.orientation();
-                operators.N(coeffN,mat);
+                operators.set_N_block(coeffN,mat);
                 // Second block is nFacesFistLayer*source_mesh.vertices().size()
                 operators.D(coeffN*L,mat);
             }
@@ -153,13 +153,13 @@ namespace OpenMEEG {
             const Mesh& mesh2 = mp(1);
 
             if (mesh1.current_barrier()) {
-                const Operators operators(mesh1,mesh2,gauss_order);
-                const int orientation = geo.oriented(mesh1,mesh2);
+                const NonDiagonalBlock operators(mesh1,mesh2,gauss_order);
+                const double orientation = geo.oriented(mesh1,mesh2);
                 operators.D(K*orientation,transmat); // D23 or D33 of the formula.
-                if (&mesh1==&mesh2) { // I_33 of the formual.
-                    DiagonalBlock block(mesh1);
+                if (&mesh1==&mesh2) { // I_33 of the formula.
+                    DiagonalBlock block(mesh1,gauss_order);
                     block.addId(-0.5*orientation,transmat);
-                } else { // S_2 of the formual.3
+                } else { // S_2 of the formula.
                     operators.S(-K*orientation*geo.sigma_inv(mesh1,mesh2),transmat);
                 }
             }

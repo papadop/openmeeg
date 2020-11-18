@@ -120,7 +120,7 @@ namespace OpenMEEG {
         TYPE HeadMatrix(const Geometry& geo,const unsigned gauss_order,const Selector& disableBlock) {
 
             TYPE symmatrix(geo.nb_parameters()-geo.nb_current_barrier_triangles());
-            Operators<true>::init(symmatrix);
+            HeadMatrixBlocks<TYPE>::init(symmatrix);
 
             // Iterate over pairs of communicating meshes (sharing a domains) to fill the
             // lower half of the HeadMat (since it is symmetric).
@@ -132,26 +132,20 @@ namespace OpenMEEG {
                 if (disableBlock(mesh1,mesh2))
                     continue;
 
-                Operators operators(mesh1,mesh2,gauss_order);
-                operators.set_blocks(symmatrix);
+                const double factor     = mp.relative_orientation()*K;
+                const double SCondCoeff =  factor*geo.sigma_inv(mesh1,mesh2);
+                const double NCondCoeff =  factor*geo.sigma(mesh1,mesh2);
+                const double DCondCoeff = -factor*geo.indicator(mesh1,mesh2);
 
-                const double factor = mp.relative_orientation()*K;
+                const double coeffs[3] = { SCondCoeff, NCondCoeff, DCondCoeff };
 
-                if (!mesh1.current_barrier() && !mesh2.current_barrier()) {
-                    // Computing S block first because it is needed for the corresponding N block
-                    const double inv_cond = geo.sigma_inv(mesh1,mesh2);
-                    operators.S(factor*inv_cond,symmatrix);
-                    operators.N(geo.sigma(mesh1,mesh2)/inv_cond,symmatrix,symmatrix);
+                if (&mesh1==&mesh2) {
+                    HeadMatrixBlocks<DiagonalBlock> operators(DiagonalBlock(mesh1,gauss_order));
+                    operators.set_blocks(coeffs,symmatrix);
                 } else {
-                    operators.N(factor*geo.sigma(mesh1,mesh2),symmatrix);
+                    HeadMatrixBlocks<NonDiagonalBlock> operators(NonDiagonalBlock(mesh1,mesh2,gauss_order));
+                    operators.set_blocks(coeffs,symmatrix);
                 }
-
-                const double Dcoeff = -factor*geo.indicator(mesh1,mesh2);
-                if (!mesh1.current_barrier())
-                    operators.D(Dcoeff,symmatrix);
-
-                if (mesh1!=mesh2 && !mesh2.current_barrier())
-                    operators.Dstar(Dcoeff,symmatrix);
             }
 
             // Deflate all current barriers as one
