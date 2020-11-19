@@ -260,7 +260,7 @@ namespace OpenMEEG {
     #ifdef HAVE_BLAS
         BLAS(dcopy,DCOPY)(sizet_to_int(ncol()),data()+i,sizet_to_int(nlin()),v.data(),1);
     #else
-        for (size_t j=0;j<ncol();j++) v.data()[j]=data()[i+nlin()*j];
+        for (size_t j=0;j<ncol();j++) v.data()[j] = data()[i+nlin()*j];
     #endif
         return v;
     }
@@ -270,7 +270,7 @@ namespace OpenMEEG {
     #ifdef HAVE_BLAS
         BLAS(dcopy,DCOPY)(sizet_to_int(nlin()),v.data(),1,data()+nlin()*j,1);
     #else
-        for (size_t i=0;i<nlin();i++) data()[i+nlin()*j]=v.data()[i];
+        for (size_t i=0;i<nlin();i++) data()[i+nlin()*j] = v.data()[i];
     #endif
     }
 
@@ -279,7 +279,7 @@ namespace OpenMEEG {
     #ifdef HAVE_BLAS
         BLAS(dcopy,DCOPY)(sizet_to_int(ncol()),v.data(),1,data()+i,sizet_to_int(nlin()));
     #else
-        for (size_t j=0;j<ncol();j++) data()[i+nlin()*j]=v.data()[j];
+        for (size_t j=0;j<ncol();j++) data()[i+nlin()*j] = v.data()[j];
     #endif
     }
 
