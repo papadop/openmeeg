@@ -69,7 +69,8 @@ namespace OpenMEEG {
 
         template <template <typename,typename> class Integrator>
         void operatorDipolePot(const Vect3& r0,const Vect3& q,const Mesh& m,Vector& rhs,const double& coeff,const unsigned gauss_order) {
-            analyticDipPot anaDP(r0,q);
+            const Dipole dip(r0,q);
+            analyticDipPot anaDP(dip);
 
             Integrator<double,analyticDipPot> gauss(0.001);
             gauss->setOrder(gauss_order);

@@ -40,7 +40,8 @@ knowledge of the CeCILL-B license and that you accept its terms.
 #pragma once
 
 #include <isnormal.H>
-#include <mesh.h>
+#include <triangle.h>
+#include <dipole.h>
 
 namespace OpenMEEG {
 
@@ -132,6 +133,18 @@ namespace OpenMEEG {
 
         Vect3 diff(const unsigned i,const unsigned j) const { return triangle.vertex(i)-triangle.vertex(j); }
 
+        // TODO: Introduce a D matrix, and a dipole....
+
+        #if 0
+        Matrix initD() const {
+            Matrix res(3,3);
+            res.setlin(1,D2);
+            res.setlin(2,D3);
+            res.setlin(3,D1);
+            return res;
+        }
+        #endif
+
     public:
 
         analyticD3(const Triangle& T):
@@ -174,6 +187,7 @@ namespace OpenMEEG {
     private:
 
         const Triangle& triangle;
+        //const Matrix    D;
         const Vect3     D1;
         const Vect3     D2;
         const Vect3     D3;
@@ -185,27 +199,19 @@ namespace OpenMEEG {
     class OPENMEEG_EXPORT analyticDipPot {
     public:
 
-        analyticDipPot(const Vect3& pos,const Vect3& moment): r0(pos),q(moment) { }
+        analyticDipPot(const Dipole& dip): dipole(dip) { }
 
-        double f(const Vect3& x) const {
-
-            // V = q.(x-r0)/||x-r0||^3
-
-            const Vect3& r = x-r0;
-            const double rn2 = r.norm2();
-            return dotprod(q,r)/(rn2*sqrt(rn2));
-        }
+        double f(const Vect3& r) const { return dipole.potential(r); }
 
     private:
 
-        const Vect3& r0;
-        const Vect3& q;
+        const Dipole& dipole;
     };
 
     class OPENMEEG_EXPORT analyticDipPotDer {
     public:
 
-        analyticDipPotDer(const Vect3& pos,const Vect3& moment,const Triangle& T): r0(pos),q(moment) {
+        analyticDipPotDer(const Dipole& dip,const Triangle& T): dipole(dip) {
 
             const Vect3& p0 = T.vertex(0);
             const Vect3& p1 = T.vertex(1);
@@ -235,22 +241,21 @@ namespace OpenMEEG {
             n.normalize();
         }
 
-        Vect3 f(const Vect3& x) const {
-            Vect3 P1part(dotprod(H0p0DivNorm2,x-H0),dotprod(H1p1DivNorm2,x-H1),dotprod(H2p2DivNorm2,x-H2));
+        Vect3 f(const Vect3& r) const {
+            Vect3 P1part(dotprod(H0p0DivNorm2,r-H0),dotprod(H1p1DivNorm2,r-H1),dotprod(H2p2DivNorm2,r-H2));
 
             // B = n.grad_x(A) with grad_x(A)= q/||^3 - 3r(q.r)/||^5
 
-            const Vect3& r   = x-r0;
-            const double rn2 = r.norm2();
-            const double EMpart = dotprod(n,q-3*dotprod(q,r)*r/rn2)/(rn2*sqrt(rn2));
+            const Vect3& x         = r-dipole.position();
+            const double inv_xnrm2 = 1.0/x.norm2();
+            const double EMpart = dotprod(n,dipole.moment()-3*dotprod(dipole.moment(),x)*x*inv_xnrm2)*(inv_xnrm2*sqrt(inv_xnrm2));
 
             return -EMpart*P1part; // RK: why - sign ?
         }
 
     private:
 
-        const Vect3& r0;
-        const Vect3& q;
+        const Dipole& dipole;
 
         Vect3 H0, H1, H2;
         Vect3 H0p0DivNorm2, H1p1DivNorm2, H2p2DivNorm2, n;

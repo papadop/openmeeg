@@ -204,11 +204,12 @@ namespace OpenMEEG {
         for (unsigned iDIP=0; iDIP<dipoles.nlin(); ++iDIP) {
             const Vect3 r0(dipoles(iDIP,0),dipoles(iDIP,1),dipoles(iDIP,2));
             const Vect3  q(dipoles(iDIP,3),dipoles(iDIP,4),dipoles(iDIP,5));
+            const Dipole dip(r0,q);
 
             const Domain& domain = (domain_name=="") ? geo.domain(r0) : geo.domain(domain_name);
             const double  coeff  = K/domain.conductivity();
 
-            const analyticDipPot anaDP(r0,q);
+            const analyticDipPot anaDP(dip);
             for (unsigned iPTS=0; iPTS<pts.size(); ++iPTS)
                 if (points_domain[iPTS]==&domain)
                     mat(iPTS,iDIP) += coeff*anaDP.f(pts[iPTS]);

@@ -78,7 +78,8 @@ namespace OpenMEEG {
         for (int i=0;i<m.triangles().size();++i) {
             const Triangle& triangle = *(m.triangles().begin()+i);
         #endif
-            const analyticDipPotDer anaDPD(r0,q,triangle);
+            const Dipole dip(r0,q);
+            const analyticDipPotDer anaDPD(dip,triangle);
 
             const Vect3& v = gauss->integrate(anaDPD,triangle);
             #pragma omp critical
@@ -91,7 +92,8 @@ namespace OpenMEEG {
     }
 
     void operatorDipolePot(const Vect3& r0,const Vect3& q,const Mesh& m,Vector& rhs,const double& coeff,const unsigned gauss_order,const bool adapt_rhs) {
-        const analyticDipPot anaDP(r0,q);
+        const Dipole dip(r0,q);
+        const analyticDipPot anaDP(dip);
 
         Integrator<double,analyticDipPot>* gauss = (adapt_rhs) ? new AdaptiveIntegrator<double,analyticDipPot>(0.001) :
                                                                  new Integrator<double,analyticDipPot>;
