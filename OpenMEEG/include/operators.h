@@ -61,8 +61,8 @@ namespace OpenMEEG {
     // TODO: Use overloading and remove the internal suffix.
 
     void operatorFerguson(const Vect3&,const Mesh&,Matrix&,const unsigned&,const double&);
-    void operatorDipolePotDer(const Vect3&,const Vect3&,const Mesh&,Vector&,const double&,const unsigned,const bool);
-    void operatorDipolePot(const Vect3&,const Vect3&,const Mesh&,Vector&,const double&,const unsigned,const bool);
+    void operatorDipolePotDer(const Dipole&,const Mesh&,Vector&,const double&,const unsigned,const bool);
+    void operatorDipolePot(const Dipole&,const Mesh&,Vector&,const double&,const unsigned,const bool);
 
     namespace Details {
         // #define ADAPT_LHS

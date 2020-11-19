@@ -63,7 +63,7 @@ namespace OpenMEEG {
         }
     }
 
-    void operatorDipolePotDer(const Vect3& r0,const Vect3& q,const Mesh& m,Vector& rhs,const double& coeff,const unsigned gauss_order,const bool adapt_rhs) {
+    void operatorDipolePotDer(const Dipole& dipole,const Mesh& m,Vector& rhs,const double& coeff,const unsigned gauss_order,const bool adapt_rhs) {
         Integrator<Vect3,analyticDipPotDer>* gauss = (adapt_rhs) ? new AdaptiveIntegrator<Vect3,analyticDipPotDer>(0.001) :
                                                                    new Integrator<Vect3,analyticDipPotDer>;
 
@@ -78,26 +78,23 @@ namespace OpenMEEG {
         for (int i=0;i<m.triangles().size();++i) {
             const Triangle& triangle = *(m.triangles().begin()+i);
         #endif
-            const Dipole dip(r0,q);
-            const analyticDipPotDer anaDPD(dip,triangle);
+            const analyticDipPotDer anaDPD(dipole,triangle);
 
             const Vect3& v = gauss->integrate(anaDPD,triangle);
             #pragma omp critical
             {
-                for (unsigned i=0;i<3;++i)
+                for (unsigned i=0; i<3; ++i)
                     rhs(triangle.vertex(i).index()) += v(i)*coeff;
             }
         }
         delete gauss;
     }
 
-    void operatorDipolePot(const Vect3& r0,const Vect3& q,const Mesh& m,Vector& rhs,const double& coeff,const unsigned gauss_order,const bool adapt_rhs) {
-        const Dipole dip(r0,q);
-        const analyticDipPot anaDP(dip);
+    void operatorDipolePot(const Dipole& dipole,const Mesh& m,Vector& rhs,const double& coeff,const unsigned gauss_order,const bool adapt_rhs) {
+        const analyticDipPot anaDP(dipole);
 
-        Integrator<double,analyticDipPot>* gauss = (adapt_rhs) ? new AdaptiveIntegrator<double,analyticDipPot>(0.001) :
-                                                                 new Integrator<double,analyticDipPot>;
-        gauss->setOrder(gauss_order);
+        AdaptiveIntegrator<double,analyticDipPot> gauss(0.001);
+        gauss.setOrder(gauss_order);
 
         #pragma omp parallel for
         #if defined NO_OPENMP || defined OPENMP_RANGEFOR
@@ -109,9 +106,8 @@ namespace OpenMEEG {
         for (int i=0;i<m.triangles().size();++i) {
             const Triangle& triangle = *(m.triangles().begin()+i);
         #endif
-            const double d = gauss->integrate(anaDP,triangle);
+            const double d = gauss.integrate(anaDP,triangle);
             rhs(triangle.index()) += d*coeff;
         }
-        delete gauss;
     }
 }

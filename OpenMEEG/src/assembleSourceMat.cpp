@@ -105,10 +105,8 @@ namespace OpenMEEG {
         ProgressBar pb(n_dipoles);
         Vector rhs_col(rhs.nlin());
         for (unsigned s=0; s<n_dipoles; ++s,++pb) {
-            const Vect3 r(dipoles(s,0),dipoles(s,1),dipoles(s,2));
-            const Vect3 q(dipoles(s,3),dipoles(s,4),dipoles(s,5));
-
-            const Domain domain = (domain_name=="") ? geo.domain(r) : geo.domain(domain_name);
+            const Dipole dipole(s,dipoles);
+            const Domain domain = (domain_name=="") ? geo.domain(dipole.position()) : geo.domain(domain_name);
 
             //  Only consider dipoles in non-zero conductivity domain.
 
@@ -122,11 +120,11 @@ namespace OpenMEEG {
                         //  Treat the mesh.
                         const double coeffD = factorD*oriented_mesh.orientation();
                         const Mesh&  mesh   = oriented_mesh.mesh();
-                        operatorDipolePotDer(r,q,mesh,rhs_col,coeffD,gauss_order,adapt_rhs);
+                        operatorDipolePotDer(dipole,mesh,rhs_col,coeffD,gauss_order,adapt_rhs);
 
                         if (!oriented_mesh.mesh().current_barrier()) {
                             const double coeff = -coeffD/cond;;
-                            operatorDipolePot(r,q,mesh,rhs_col,coeff,gauss_order,adapt_rhs);
+                            operatorDipolePot(dipole,mesh,rhs_col,coeff,gauss_order,adapt_rhs);
                         }
                     }
                 }
@@ -187,13 +185,14 @@ namespace OpenMEEG {
         std::vector<const Domain*> points_domain;
         std::vector<Vect3>         pts;
         for (unsigned i=0; i<points.nlin(); ++i) {
-            const Domain& domain = geo.domain(Vect3(points(i,0),points(i,1),points(i,2)));
+            const Vect3   point(points(i,0),points(i,1),points(i,2));
+            const Domain& domain = geo.domain(point);
             if (domain.conductivity()!=0.0) {
                 points_domain.push_back(&domain);
-                pts.push_back(Vect3(points(i,0),points(i,1),points(i,2)));
+                pts.push_back(point);
             } else {
-                std::cerr << " DipSource2InternalPot: Point [ " << points.getlin(i);
-                std::cerr << "] is outside the head. Point is dropped." << std::endl;
+                std::cerr << " DipSource2InternalPot: Point [ " << points.getlin(i)
+                          << "] is outside the head. Point is dropped." << std::endl;
             }
         }
 
@@ -202,14 +201,12 @@ namespace OpenMEEG {
         mat.set(0.0);
 
         for (unsigned iDIP=0; iDIP<dipoles.nlin(); ++iDIP) {
-            const Vect3 r0(dipoles(iDIP,0),dipoles(iDIP,1),dipoles(iDIP,2));
-            const Vect3  q(dipoles(iDIP,3),dipoles(iDIP,4),dipoles(iDIP,5));
-            const Dipole dip(r0,q);
+            const Dipole dipole(iDIP,dipoles);
 
-            const Domain& domain = (domain_name=="") ? geo.domain(r0) : geo.domain(domain_name);
+            const Domain& domain = (domain_name=="") ? geo.domain(dipole.position()) : geo.domain(domain_name);
             const double  coeff  = K/domain.conductivity();
 
-            const analyticDipPot anaDP(dip);
+            const analyticDipPot anaDP(dipole);
             for (unsigned iPTS=0; iPTS<pts.size(); ++iPTS)
                 if (points_domain[iPTS]==&domain)
                     mat(iPTS,iDIP) += coeff*anaDP.f(pts[iPTS]);
