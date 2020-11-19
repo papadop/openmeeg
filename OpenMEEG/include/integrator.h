@@ -166,46 +166,45 @@ namespace OpenMEEG {
     template <typename T,typename I>
     class OPENMEEG_EXPORT Integrator {
 
-        unsigned order;
-
-    public:
-
-        Integrator()                   { setOrder(3);   }
-        Integrator(const double)       { setOrder(3);   }
-        Integrator(const unsigned ord) { setOrder(ord); }
-        virtual ~Integrator() { }
-
-        inline void setOrder(const unsigned n) {
-            if (n<4) {
-                order = n;
-            } else {
-                std::cout << "Unavailable Gauss order " << n << ": min is 1, max is 3" << std::endl;
-                order = (n<1) ? 1 : 3;
-            }
-        }
-
-        virtual inline T integrate(const I& fc,const Triangle& triangle) {
-            const Vect3 points[3] = { triangle.vertex(0), triangle.vertex(1), triangle.vertex(2) };
-            return triangle_integration(fc,points);
+        static unsigned safe_order(const unsigned n) {
+            if (n>0 && n<4)
+                return n;
+            std::cout << "Unavailable Gauss order " << n << ": min is 1, max is 3" << std::endl;
+            return (n<1) ? 1 : 3;
         }
 
     protected:
 
-        inline T triangle_integration(const I& fc,const Vect3 points[3]) {
-            T result = 0;
+        typedef Vect3 Point;
+        typedef Point TrianglePoints[3];
+
+    public:
+
+        Integrator(const unsigned ord=3,const double tol=0.0): order(safe_order(ord)) {  }
+
+        virtual T integrate(const I& fc,const Triangle& triangle) const {
+            const TrianglePoints tripts = { triangle.vertex(0), triangle.vertex(1), triangle.vertex(2) };
+            return triangle_integration(fc,tripts);
+        }
+
+    protected:
+
+        T triangle_integration(const I& fc,const TrianglePoints& triangle) const {
+            T result = 0.0;
             for (unsigned i=0;i<nbPts[order];++i) {
                 Vect3 v(0.0,0.0,0.0);
                 for (unsigned j=0;j<3;++j)
-                    v.multadd(cordBars[order][i][j],points[j]);
+                    v.multadd(cordBars[order][i][j],triangle[j]);
                 result += cordBars[order][i][3]*fc.f(v);
             }
 
             // compute double area of triangle defined by points
 
-            const Vect3 crossprod = (points[1]-points[0])^(points[2]-points[0]);
-            const double S = crossprod.norm();
-            return result*S;
+            const double area2 = crossprod(triangle[1]-triangle[0],triangle[2]-triangle[0]).norm();
+            return result*area2;
         }
+
+        const unsigned order;
     };
 
     template <typename T,typename I>
@@ -215,46 +214,45 @@ namespace OpenMEEG {
 
     public:
 
-        AdaptiveIntegrator(const double tol=0.0001): tolerance(tol) { }
-        ~AdaptiveIntegrator() { }
+        AdaptiveIntegrator(const unsigned ord,const double tol=0.0001): base(ord),tolerance(tol) { }
 
-        double norm(const double a) { return fabs(a);  }
-        double norm(const Vect3& a) { return a.norm(); }
+        double norm(const double a) const { return fabs(a);  }
+        double norm(const Vect3& a) const { return a.norm(); }
 
-        virtual T integrate(const I& fc, const Triangle& triangle) {
-            const Vect3 points[3] = { triangle.vertex(0), triangle.vertex(1), triangle.vertex(2) };
-            T I0 = base::triangle_integration(fc,points);
-            return adaptive_integration(fc,points,I0,0);
+        virtual T integrate(const I& fc,const Triangle& triangle) const {
+            const TrianglePoints tripts = { triangle.vertex(0), triangle.vertex(1), triangle.vertex(2) };
+            const T& coarse = base::triangle_integration(fc,tripts);
+            return adaptive_integration(fc,tripts,coarse,0);
         }
 
     private:
 
-        double tolerance;
+        using typename base::Point;
+        using typename base::TrianglePoints;
 
-        inline T adaptive_integration(const I& fc,const Vect3* points,T I0,unsigned n) {
-            Vect3 newpoint0 = 0.5*(points[0]+points[1]);
-            Vect3 newpoint1 = 0.5*(points[1]+points[2]);
-            Vect3 newpoint2 = 0.5*(points[2]+points[0]);
-            Vect3 points1[3] = { points[0], newpoint0, newpoint2 };
-            Vect3 points2[3] = { points[1], newpoint1, newpoint0 };
-            Vect3 points3[3] = { points[2], newpoint2, newpoint1 };
-            Vect3 points4[3] = { newpoint0, newpoint1, newpoint2 };
-            T I1 = base::triangle_integration(fc,points1);
-            T I2 = base::triangle_integration(fc,points2);
-            T I3 = base::triangle_integration(fc,points3);
-            T I4 = base::triangle_integration(fc,points4);
-            T sum = I1+I2+I3+I4;
-            if (norm(I0-sum)>tolerance*norm(I0)) {
-                n = n+1;
-                if (n<10) {
-                    I1 = adaptive_integration(fc,points1,I1,n);
-                    I2 = adaptive_integration(fc,points2,I2,n);
-                    I3 = adaptive_integration(fc,points3,I3,n);
-                    I4 = adaptive_integration(fc,points4,I4,n);
-                    I0 = I1+I2+I3+I4;
-                }
+        T adaptive_integration(const I& fc,const TrianglePoints& triangle,const T& coarse,const unsigned depth) const {
+            const Point midpoints[] = { 0.5*(triangle[1]+triangle[2]), 0.5*(triangle[2]+triangle[0]), 0.5*(triangle[0]+triangle[1]) };
+            const TrianglePoints new_triangles[] = {
+                { triangle[0],  midpoints[1], midpoints[2] }, { midpoints[0], triangle[1],  midpoints[2] },
+                { midpoints[0], midpoints[1], triangle[2]  }, { midpoints[0], midpoints[1], midpoints[2] }
+            };
+
+            T refined = 0.0;
+            T integrals[4];
+            for (unsigned i=0; i<4; ++i) {
+                integrals[i] = base::triangle_integration(fc,new_triangles[i]);
+                refined += integrals[i];
             }
-            return I0;
+
+            if (norm(coarse-refined)<=tolerance*norm(coarse) || depth==10)
+                return coarse;
+
+            T sum = 0.0;
+            for (unsigned i=0; i<4; ++i)
+                sum += adaptive_integration(fc,new_triangles[i],integrals[i],depth+1);
+            return sum;
         }
+
+        const double tolerance;
     };
 }

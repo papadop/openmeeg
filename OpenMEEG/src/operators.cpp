@@ -64,10 +64,9 @@ namespace OpenMEEG {
     }
 
     void operatorDipolePotDer(const Dipole& dipole,const Mesh& m,Vector& rhs,const double& coeff,const unsigned gauss_order,const bool adapt_rhs) {
-        Integrator<Vect3,analyticDipPotDer>* gauss = (adapt_rhs) ? new AdaptiveIntegrator<Vect3,analyticDipPotDer>(0.001) :
-                                                                   new Integrator<Vect3,analyticDipPotDer>;
+        Integrator<Vect3,analyticDipPotDer>* gauss = (adapt_rhs) ? new AdaptiveIntegrator<Vect3,analyticDipPotDer>(gauss_order,0.001) :
+                                                                   new Integrator<Vect3,analyticDipPotDer>(gauss_order);
 
-        gauss->setOrder(gauss_order);
         #pragma omp parallel for
         #if defined NO_OPENMP || defined OPENMP_RANGEFOR
         for (const auto& triangle : m.triangles()) {
@@ -93,8 +92,7 @@ namespace OpenMEEG {
     void operatorDipolePot(const Dipole& dipole,const Mesh& m,Vector& rhs,const double& coeff,const unsigned gauss_order,const bool adapt_rhs) {
         const analyticDipPot anaDP(dipole);
 
-        AdaptiveIntegrator<double,analyticDipPot> gauss(0.001);
-        gauss.setOrder(gauss_order);
+        AdaptiveIntegrator<double,analyticDipPot> gauss(gauss_order,0.001);
 
         #pragma omp parallel for
         #if defined NO_OPENMP || defined OPENMP_RANGEFOR

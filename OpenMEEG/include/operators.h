@@ -67,13 +67,12 @@ namespace OpenMEEG {
     namespace Details {
         // #define ADAPT_LHS
 
+        // NOT USED !!! Proof of concept
         template <template <typename,typename> class Integrator>
-        void operatorDipolePot(const Vect3& r0,const Vect3& q,const Mesh& m,Vector& rhs,const double& coeff,const unsigned gauss_order) {
-            const Dipole dip(r0,q);
-            analyticDipPot anaDP(dip);
+        void operatorDipolePot(const Dipole& dipole,const Mesh& m,Vector& rhs,const double& coeff,const unsigned gauss_order) {
+            analyticDipPot anaDP(dipole);
 
-            Integrator<double,analyticDipPot> gauss(0.001);
-            gauss->setOrder(gauss_order);
+            Integrator<double,analyticDipPot> gauss(gauss_order,0.001);
 
             #pragma omp parallel for
             #if defined NO_OPENMP || defined OPENMP_RANGEFOR
@@ -135,11 +134,10 @@ namespace OpenMEEG {
 
         double S(const analyticS& analyS,const Triangle& triangle) const {
         #ifdef ADAPT_LHS
-            AdaptiveIntegrator<double,analyticS> gauss(0.005);
+            AdaptiveIntegrator<double,analyticS> gauss(gauss_order,0.005);
         #else
-            STATIC_OMP Integrator<double,analyticS> gauss;
+            STATIC_OMP Integrator<double,analyticS> gauss(gauss_order);
         #endif
-            gauss.setOrder(gauss_order);
             return gauss.integrate(analyS,triangle);
         }
 
@@ -214,8 +212,7 @@ namespace OpenMEEG {
             analyticD3 analyD(T2);
 
         #ifdef ADAPT_LHS
-            AdaptiveIntegrator<Vect3,analyticD3> gauss(0.005);
-            gauss.setOrder(gauss_order);
+            AdaptiveIntegrator<Vect3,analyticD3> gauss(gauss_order,0.005);
         #else
             STATIC_OMP Integrator<Vect3, analyticD3> gauss(gauss_order);
         #endif
