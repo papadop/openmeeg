@@ -117,7 +117,7 @@ namespace OpenMEEG {
         };
 
         template <typename TYPE,typename Selector>
-        TYPE HeadMatrix(const Geometry& geo,const AdaptiveIntegrator& integrator,const Selector& disableBlock) {
+        TYPE HeadMatrix(const Geometry& geo,const Integrator& integrator,const Selector& disableBlock) {
 
             TYPE symmatrix(geo.nb_parameters()-geo.nb_current_barrier_triangles());
             HeadMatrixBlocks<TYPE>::init(symmatrix);
@@ -169,11 +169,11 @@ namespace OpenMEEG {
         return cond_coeffs;
     }
 
-    SymMatrix HeadMat(const Geometry& geo,const AdaptiveIntegrator& integrator) {
+    SymMatrix HeadMat(const Geometry& geo,const Integrator& integrator) {
         return Details::HeadMatrix<SymMatrix>(geo,integrator,Details::AllBlocks());
     }
 
-    Matrix HeadMatrix(const Geometry& geo,const Interface& Cortex,const AdaptiveIntegrator& integrator,const unsigned extension=0) {
+    Matrix HeadMatrix(const Geometry& geo,const Interface& Cortex,const Integrator& integrator,const unsigned extension=0) {
 
         const Mesh& cortex = Cortex.oriented_meshes().front().mesh();
         const SymMatrix& symmatrix = Details::HeadMatrix<SymMatrix>(geo,integrator,Details::AllButBlock(cortex));
@@ -199,7 +199,7 @@ namespace OpenMEEG {
     }
 
     Matrix CorticalMat(const Geometry& geo,const SparseMatrix& M,const std::string& domain_name,
-                       const double alpha,const double beta,const std::string& filename,const AdaptiveIntegrator& integrator)
+                       const double alpha,const double beta,const std::string& filename,const Integrator& integrator)
     {
         // Following the article: M. Clerc, J. Kybic "Cortical mapping by Laplace–Cauchy transmission using
         // a boundary element method".
@@ -281,7 +281,7 @@ namespace OpenMEEG {
     }
 
     Matrix CorticalMat2(const Geometry& geo,const SparseMatrix& M,const std::string& domain_name,
-                        const double gamma,const std::string &filename,const AdaptiveIntegrator& integrator)
+                        const double gamma,const std::string &filename,const Integrator& integrator)
     {
         // Re-writting of the optimization problem in M. Clerc, J. Kybic "Cortical mapping by Laplace–Cauchy
         // transmission using a boundary element method".

@@ -49,7 +49,7 @@ knowledge of the CeCILL-B license and that you accept its terms.
 
 namespace OpenMEEG {
 
-    Matrix SurfSourceMat(const Geometry& geo,Mesh& source_mesh,const AdaptiveIntegrator& integrator) {
+    Matrix SurfSourceMat(const Geometry& geo,Mesh& source_mesh,const Integrator& integrator) {
 
         // Check that there is no overlapping between the geometry and the source mesh.
 
@@ -93,9 +93,8 @@ namespace OpenMEEG {
     }
 
     Matrix
-    DipSourceMat(const Geometry& geo,const Matrix& dipoles,const AdaptiveIntegrator& integrator,
-                 const std::string& domain_name)
-    {
+    DipSourceMat(const Geometry& geo,const Matrix& dipoles,const Integrator& integrator,const std::string& domain_name) {
+
         const size_t size      = geo.nb_parameters()-geo.nb_current_barrier_triangles();
         const size_t n_dipoles = dipoles.nlin();
 
@@ -134,7 +133,7 @@ namespace OpenMEEG {
         return rhs;
     }
 
-    Matrix EITSourceMat(const Geometry& geo,const Sensors& electrodes,const AdaptiveIntegrator& integrator) {
+    Matrix EITSourceMat(const Geometry& geo,const Sensors& electrodes,const Integrator& integrator) {
 
         // Matrix to be applied to the scalp-injected current to obtain the source term of the EIT foward problem,
         // following article BOUNDARY ELEMENT FORMULATION FOR ELECTRICAL IMPEDANCE TOMOGRAPHY

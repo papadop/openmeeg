@@ -59,8 +59,8 @@ knowledge of the CeCILL-B license and that you accept its terms.
 namespace OpenMEEG {
 
     void operatorFerguson(const Vect3&,const Mesh&,Matrix&,const unsigned&,const double&);
-    void operatorDipolePotDer(const Dipole&,const Mesh&,Vector&,const double&,const AdaptiveIntegrator&);
-    void operatorDipolePot(const Dipole&,const Mesh&,Vector&,const double&,const AdaptiveIntegrator&);
+    void operatorDipolePotDer(const Dipole&,const Mesh&,Vector&,const double&,const Integrator&);
+    void operatorDipolePot(const Dipole&,const Mesh&,Vector&,const double&,const Integrator&);
 
     namespace Details {
 
@@ -91,7 +91,7 @@ namespace OpenMEEG {
     class BlocksBase {
     public:
 
-        BlocksBase(const AdaptiveIntegrator& intg): integrator(intg) { }
+        BlocksBase(const Integrator& intg): integrator(intg) { }
 
         void message(const char* op_name,const Mesh& mesh) const {
             if (verbose)
@@ -183,8 +183,8 @@ namespace OpenMEEG {
 
     protected:
 
-        const AdaptiveIntegrator integrator;
-        bool                     verbose = true;
+        const Integrator integrator;
+        bool             verbose = true;
     };
 
     class DiagonalBlock: public BlocksBase {
@@ -209,7 +209,7 @@ namespace OpenMEEG {
         
     public:
 
-        DiagonalBlock(const Mesh& m,const AdaptiveIntegrator& intg): base(intg),mesh(m) { }
+        DiagonalBlock(const Mesh& m,const Integrator& intg): base(intg),mesh(m) { }
 
         template <typename T>
         void set_S_block(const double& coeff,T& matrix) {
@@ -326,7 +326,6 @@ namespace OpenMEEG {
               double Scoeff = 0.0;
     };
 
-    template <unsigned AdaptiveLevels=0>
     class PartialBlock {
     public:
 
@@ -387,7 +386,7 @@ namespace OpenMEEG {
         //  - The gauss order parameter (for adaptive integration).
         //  - A verbosity parameters (for printing the action on the terminal).
 
-        NonDiagonalBlock(const Mesh& m1,const Mesh& m2,const AdaptiveIntegrator& intg): base(intg),mesh1(m1),mesh2(m2) { }
+        NonDiagonalBlock(const Mesh& m1,const Mesh& m2,const Integrator& intg): base(intg),mesh1(m1),mesh2(m2) { }
 
         template <typename T>
         void set_S_block(const double& coeff,T& matrix) {

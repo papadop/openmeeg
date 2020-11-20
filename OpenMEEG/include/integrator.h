@@ -48,33 +48,6 @@ knowledge of the CeCILL-B license and that you accept its terms.
 
 namespace OpenMEEG {
 
-    // light class containing d Vect3
-
-    template <unsigned d>
-    class OPENMEEG_EXPORT Vect3array {
-
-        Vect3 t[d];
-
-    public:
-
-        Vect3array() {};
-
-        inline Vect3array(const double x) {
-            for (unsigned i=0;i<d;++i)
-                t[i] = Vect3(x);
-        }
-
-        inline Vect3array<d> operator*(const double x) const {
-            Vect3array<d> r;
-            for (unsigned i=0;i<d;++i)
-                r.t[i] = t[i]*x;
-            return r;
-        }
-
-        inline Vect3  operator()(const int i) const { return t[i]; }
-        inline Vect3& operator()(const int i)       { return t[i]; }
-    };
-
     // Quadrature rules are from Marc Bonnet's book: Equations integrales..., Appendix B.3
 
     static const double cordBars[4][16][4] = {
@@ -161,9 +134,10 @@ namespace OpenMEEG {
 
     }; // end of gaussTriangleParams
 
-    static const unsigned nbPts[4] = {3, 6, 7, 16};
-
     class OPENMEEG_EXPORT Integrator {
+
+        typedef Vect3 Point;
+        typedef Point TrianglePoints[3];
 
         static unsigned safe_order(const unsigned n) {
             if (n>0 && n<4)
@@ -172,22 +146,27 @@ namespace OpenMEEG {
             return (n<1) ? 1 : 3;
         }
 
-    protected:
-
-        typedef Vect3 Point;
-        typedef Point TrianglePoints[3];
-
     public:
 
-        Integrator(const unsigned ord=3,const double tol=0.0): order(safe_order(ord)) {  }
+        Integrator(const unsigned ord): Integrator(ord,0,0.0) { }
+        Integrator(const unsigned ord,const double tol): Integrator(ord,10,tol) { }
+        Integrator(const unsigned ord,const unsigned levels,const double tol=0.0001):
+            order(safe_order(ord)),tolerance(tol),max_depth(levels)
+        { }
+
+        double norm(const double a) const { return fabs(a);  }
+        double norm(const Vect3& a) const { return a.norm(); }
+
+        // TODO: T can be deduced from Function.
 
         template <typename T,typename Function>
         T integrate(const Function& function,const Triangle& triangle) const {
             const TrianglePoints tripts = { triangle.vertex(0), triangle.vertex(1), triangle.vertex(2) };
-            return triangle_integration(function,tripts);
+            const T& coarse = triangle_integration<T>(function,tripts);
+            return (max_depth==0) ? coarse : adaptive_integration<T>(function,tripts,coarse,max_depth);
         }
 
-    protected:
+    private:
 
         template <typename T,typename Function>
         T triangle_integration(const Function& function,const TrianglePoints& triangle) const {
@@ -205,36 +184,6 @@ namespace OpenMEEG {
             return result*area2;
         }
 
-        const unsigned order;
-    };
-
-    class OPENMEEG_EXPORT AdaptiveIntegrator: public Integrator {
-
-        typedef Integrator base;
-
-    public:
-
-        AdaptiveIntegrator(const unsigned ord): base(ord),tolerance(0.0),max_depth(0) { }
-        AdaptiveIntegrator(const unsigned ord,const double tol): base(ord),tolerance(tol),max_depth(10) { }
-        AdaptiveIntegrator(const unsigned ord,const unsigned levels,const double tol=0.0001): base(ord),tolerance(tol),max_depth(levels) { }
-
-        double norm(const double a) const { return fabs(a);  }
-        double norm(const Vect3& a) const { return a.norm(); }
-
-        // TODO: T can be deduced from Function.
-
-        template <typename T,typename Function>
-        T integrate(const Function& function,const Triangle& triangle) const {
-            const TrianglePoints tripts = { triangle.vertex(0), triangle.vertex(1), triangle.vertex(2) };
-            const T& coarse = base::triangle_integration<T>(function,tripts);
-            return (max_depth==0) ? coarse : adaptive_integration<T>(function,tripts,coarse,max_depth);
-        }
-
-    private:
-
-        using typename base::Point;
-        using typename base::TrianglePoints;
-
         template <typename T,typename Function>
         T adaptive_integration(const Function& function,const TrianglePoints& triangle,const T& coarse,const unsigned level) const {
             const Point midpoints[] = { 0.5*(triangle[1]+triangle[2]), 0.5*(triangle[2]+triangle[0]), 0.5*(triangle[0]+triangle[1]) };
@@ -246,7 +195,7 @@ namespace OpenMEEG {
             T refined = 0.0;
             T integrals[4];
             for (unsigned i=0; i<4; ++i) {
-                integrals[i] = base::triangle_integration<T>(function,new_triangles[i]);
+                integrals[i] = triangle_integration<T>(function,new_triangles[i]);
                 refined += integrals[i];
             }
 
@@ -259,6 +208,9 @@ namespace OpenMEEG {
             return sum;
         }
 
+        static constexpr unsigned nbPts[4] = { 3, 6, 7, 16 };
+
+        const unsigned order;
         const double   tolerance;
         const unsigned max_depth;
     };
