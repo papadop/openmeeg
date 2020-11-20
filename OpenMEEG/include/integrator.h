@@ -130,12 +130,12 @@ namespace OpenMEEG {
 
         // Quadrature rules are from Marc Bonnet's book: Equations integrales..., Appendix B.3
 
-        struct QRule {
+        struct QuadratureRule {
             double barycentric_coordinates[3];
             double weight;
         };
 
-        static constexpr QRule rules[4][16] = {
+        static constexpr QuadratureRule rules[4][16] = {
             {   // Parameters for N=3
                 {{ 0.166666666666667, 0.166666666666667, 0.666666666666667 }, 0.166666666666667 },
                 {{ 0.166666666666667, 0.666666666666667, 0.166666666666667 }, 0.166666666666667 },
