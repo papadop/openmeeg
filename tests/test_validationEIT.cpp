@@ -68,11 +68,8 @@ getHelp(const char* argv[]) {
 
 Vector
 VR(const Geometry& geo,const Matrix& points,const SymMatrix& HeadMatInv,const Matrix& rhsEIT) {
-
     const Matrix& matdx = Surf2VolMat(geo,points);
-
     const Matrix& EEGGainMatrix = matdx*HeadMatInv(0,matdx.ncol()-1,0,HeadMatInv.ncol()-1);
-
     return (EEGGainMatrix*rhsEIT).getcol(0);
 }
 
