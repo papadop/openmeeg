@@ -73,17 +73,18 @@ namespace OpenMEEG {
 
         // TODO: T can be deduced from Function.
 
-        template <typename T,typename Function>
-        T integrate(const Function& function,const Triangle& triangle) const {
+        template <typename Function>
+        decltype(auto) integrate(const Function& function,const Triangle& triangle) const {
             const TrianglePoints tripts = { triangle.vertex(0), triangle.vertex(1), triangle.vertex(2) };
-            const T& coarse = triangle_integration<T>(function,tripts);
-            return (max_depth==0) ? coarse : adaptive_integration<T>(function,tripts,coarse,max_depth);
+            const auto& coarse = triangle_integration(function,tripts);
+            return (max_depth==0) ? coarse : adaptive_integration(function,tripts,coarse,max_depth);
         }
 
     private:
 
-        template <typename T,typename Function>
-        T triangle_integration(const Function& function,const TrianglePoints& triangle) const {
+        template <typename Function>
+        decltype(auto) triangle_integration(const Function& function,const TrianglePoints& triangle) const {
+            using T = decltype(function(Vect3()));
             T result = 0.0;
             for (unsigned i=0;i<nbPts[order];++i) {
                 Vect3 v(0.0,0.0,0.0);
@@ -109,7 +110,7 @@ namespace OpenMEEG {
             T refined = 0.0;
             T integrals[4];
             for (unsigned i=0; i<4; ++i) {
-                integrals[i] = triangle_integration<T>(function,new_triangles[i]);
+                integrals[i] = triangle_integration(function,new_triangles[i]);
                 refined += integrals[i];
             }
 
@@ -118,7 +119,7 @@ namespace OpenMEEG {
 
             T sum = 0.0;
             for (unsigned i=0; i<4; ++i)
-                sum += adaptive_integration<T>(function,new_triangles[i],integrals[i],level-1);
+                sum += adaptive_integration(function,new_triangles[i],integrals[i],level-1);
             return sum;
         }
 

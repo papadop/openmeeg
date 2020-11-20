@@ -77,7 +77,7 @@ namespace OpenMEEG {
             const analyticDipPotDer anaDPD(dipole,triangle);
             const auto dipder = [&](const Vect3& r) { return anaDPD.f(r); };
 
-            const Vect3& v = integrator.integrate<Vect3>(dipder,triangle);
+            const Vect3& v = integrator.integrate(dipder,triangle);
             #pragma omp critical
             {
                 for (unsigned i=0; i<3; ++i)
@@ -98,7 +98,7 @@ namespace OpenMEEG {
         for (int i=0;i<m.triangles().size();++i) {
             const Triangle& triangle = *(m.triangles().begin()+i);
         #endif
-            const double d = integrator.integrate<double>(dippot,triangle);
+            const double d = integrator.integrate(dippot,triangle);
             rhs(triangle.index()) += d*coeff;
         }
     }

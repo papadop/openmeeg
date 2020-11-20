@@ -175,7 +175,7 @@ namespace OpenMEEG {
             // consider varying order of quadrature with the distance between T1 and T2
             const analyticD3 analyD(T2);
             const auto& Dfunc = [&analyD](const Vect3& r) { return analyD.f(r); };
-            const Vect3 total = integrator.integrate<Vect3>(Dfunc,T1);
+            const Vect3 total = integrator.integrate(Dfunc,T1);
 
             for (unsigned i=0; i<3; ++i)
                 mat(T1.index(),T2.vertex(i).index()) += total(i)*coeff;
@@ -262,7 +262,7 @@ namespace OpenMEEG {
                 for (int i2=tit1-triangles.begin(); i2<triangles.size(); ++i2) {
                     const Triangle& triangle2 = *(triangles.begin()+i2);
                 #endif
-                    matrix(triangle1.index(),triangle2.index()) = base::integrator.template integrate<double>(Sfunc,triangle2)*coeff;
+                    matrix(triangle1.index(),triangle2.index()) = base::integrator.integrate(Sfunc,triangle2)*coeff;
                 }
             }
         }
@@ -442,7 +442,7 @@ namespace OpenMEEG {
                 for (int i2=0;i2<m2_triangles.size();++i2) {
                     const Triangle& triangle2 = *(m2_triangles.begin()+i2);
                 #endif
-                    matrix(triangle1.index(),triangle2.index()) = base::integrator.template integrate<double>(Sfunc,triangle2)*coeff;
+                    matrix(triangle1.index(),triangle2.index()) = base::integrator.integrate(Sfunc,triangle2)*coeff;
                 }
                 ++pb;
             }
