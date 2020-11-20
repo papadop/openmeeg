@@ -43,19 +43,18 @@ knowledge of the CeCILL-B license and that you accept its terms.
 #include <operators.h>
 #include <assemble.h>
 #include <sensors.h>
+#include <GeometryExceptions.H>
 
 #include <constants.h>
 
 namespace OpenMEEG {
 
-    SurfSourceMat::SurfSourceMat(const Geometry& geo,Mesh& source_mesh,const unsigned gauss_order) {
+    Matrix SurfSourceMat(const Geometry& geo,Mesh& source_mesh,const AdaptiveIntegrator& integrator) {
 
         // Check that there is no overlapping between the geometry and the source mesh.
 
-        if (!geo.check(source_mesh)) {
-            std::cerr << "Error: source mesh overlapps the geometry" << std::endl;
-            return;
-        }
+        if (!geo.check(source_mesh))
+            throw OverlappingSourceMesh();
 
         // The mesh is included in a domain of the geometry.
 
@@ -71,8 +70,7 @@ namespace OpenMEEG {
                   << " source_mesh located in domain \"" << domain.name() << "\"." << std::endl
                   << std::endl;
 
-        Matrix& mat = *this;
-        mat = Matrix((geo.nb_parameters()-geo.nb_current_barrier_triangles()),source_mesh.vertices().size());
+        Matrix mat(geo.nb_parameters()-geo.nb_current_barrier_triangles(),source_mesh.vertices().size());
         mat.set(0.0);
 
         const double L  = -1.0/domain.conductivity();
@@ -81,7 +79,7 @@ namespace OpenMEEG {
             for (const auto& oriented_mesh : boundary.interface().oriented_meshes()) {
                 const Mesh& mesh = oriented_mesh.mesh();
 
-                NonDiagonalBlock operators(mesh,source_mesh,gauss_order);
+                NonDiagonalBlock operators(mesh,source_mesh,integrator);
 
                 // First block is nVertexFistLayer*source_mesh.vertices().size()
                 const double coeffN = factorN*oriented_mesh.orientation();
@@ -90,6 +88,8 @@ namespace OpenMEEG {
                 operators.D(coeffN*L,mat);
             }
         }
+
+        return mat;
     }
 
     Matrix
@@ -134,7 +134,7 @@ namespace OpenMEEG {
         return rhs;
     }
 
-    EITSourceMat::EITSourceMat(const Geometry& geo,const Sensors& electrodes,const unsigned gauss_order) {
+    Matrix EITSourceMat(const Geometry& geo,const Sensors& electrodes,const AdaptiveIntegrator& integrator) {
 
         // Matrix to be applied to the scalp-injected current to obtain the source term of the EIT foward problem,
         // following article BOUNDARY ELEMENT FORMULATION FOR ELECTRICAL IMPEDANCE TOMOGRAPHY
@@ -152,11 +152,11 @@ namespace OpenMEEG {
             const Mesh& mesh2 = mp(1);
 
             if (mesh1.current_barrier()) {
-                const NonDiagonalBlock operators(mesh1,mesh2,gauss_order);
+                const NonDiagonalBlock operators(mesh1,mesh2,integrator);
                 const int orientation = geo.oriented(mesh1,mesh2);
                 operators.D(K*orientation,transmat); // D23 or D33 of the formula.
                 if (&mesh1==&mesh2) { // I_33 of the formula.
-                    DiagonalBlock block(mesh1,gauss_order);
+                    DiagonalBlock block(mesh1,integrator);
                     block.addId(-0.5*orientation,transmat);
                 } else { // S_2 of the formula.
                     operators.S(-K*orientation*geo.sigma_inv(mesh1,mesh2),transmat);
@@ -165,8 +165,7 @@ namespace OpenMEEG {
         }
 
         const size_t n_sensors = electrodes.getNumberOfSensors();
-        Matrix& mat = *this;
-        mat = Matrix((geo.nb_parameters()-geo.nb_current_barrier_triangles()),n_sensors);
+        Matrix mat(geo.nb_parameters()-geo.nb_current_barrier_triangles(),n_sensors);
         mat.set(0.0);
 
         for (size_t ielec=0; ielec<n_sensors; ++ielec)
@@ -177,9 +176,10 @@ namespace OpenMEEG {
                 for (size_t i=0; i<mat.nlin(); ++i)
                     mat(i,ielec) += transmat(triangle.index(),i)*coeff;
             }
+        return mat;
     }
 
-    DipSource2InternalPotMat::DipSource2InternalPotMat(const Geometry& geo,const Matrix& dipoles,const Matrix& points,const std::string& domain_name) {
+    Matrix DipSource2InternalPotMat(const Geometry& geo,const Matrix& dipoles,const Matrix& points,const std::string& domain_name) {
 
         // Points with one more column for the index of the domain they belong
 
@@ -197,8 +197,7 @@ namespace OpenMEEG {
             }
         }
 
-        Matrix& mat = *this;
-        mat = Matrix(pts.size(),dipoles.nlin());
+        Matrix mat(pts.size(),dipoles.nlin());
         mat.set(0.0);
 
         for (unsigned iDIP=0; iDIP<dipoles.nlin(); ++iDIP) {
@@ -211,5 +210,6 @@ namespace OpenMEEG {
                 if (points_domain[iPTS]==&domain)
                     mat(iPTS,iDIP) += coeff*dipole.potential(pts[iPTS]);
         }
+        return mat;
     }
 }

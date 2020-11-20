@@ -90,14 +90,14 @@ int main(int argc, char** argv)
     if (option(argc,argv,{"-HeadMat","-HM", "-hm"},
                 {"geometry file", "conductivity file", "output file"}) ) {
         // Loading surfaces from geometry file
-        Geometry geo(argv[2],argv[3],OLD_ORDERING);
+        const Geometry geo(argv[2],argv[3],OLD_ORDERING);
 
         // Check for intersecting meshes
         if (!geo.selfCheck())
             exit(1);
 
         // Assembling Matrix from discretization.
-        HeadMat HM(geo,gauss_order);
+        const SymMatrix& HM = HeadMat(geo);
         HM.save(argv[4]);
     } else if (option(argc,argv,{ "-CorticalMat","-CM","-cm" },
                                 { "geometry file","conductivity file","sensors file","domain name","output file" })) {
@@ -143,21 +143,22 @@ int main(int argc, char** argv)
         }
 
         // Loading surfaces from geometry file
-        Geometry geo(argv[2],argv[3],OLD_ORDERING);
+        const Geometry geo(argv[2],argv[3],OLD_ORDERING);
 
         // Check for intersecting meshes
         if (!geo.selfCheck())
             exit(1);
 
         // read the file containing the positions of the EEG patches
-        Sensors electrodes(argv[4]);
-        Head2EEGMat M(geo, electrodes);
+
+        const Sensors electrodes(argv[4]);
+        const SparseMatrix& M = Head2EEGMat(geo,electrodes);
 
         // Assembling Matrix from discretization.
 
-        const Matrix* CM = (gamma>0.0) ? static_cast<Matrix*>(new CorticalMat2(geo,M,argv[5],gauss_order,gamma,filename)) :
-                                         static_cast<Matrix*>(new CorticalMat (geo,M,argv[5],gauss_order,alpha,beta,filename));
-        CM->save(argv[6]);
+        const Matrix& CM = (gamma>0.0) ? CorticalMat2(geo,M,argv[5],gamma,filename) :
+                                         CorticalMat(geo,M,argv[5],alpha,beta,filename);
+        CM.save(argv[6]);
     }
 
     /*********************************************************************************************
@@ -167,14 +168,13 @@ int main(int argc, char** argv)
                      {"geometry file", "conductivity file", "'mesh of sources' file", "output file"})) {
 
         // Loading surfaces from geometry file.
-        Geometry geo(argv[2],argv[3],OLD_ORDERING);
+        const Geometry geo(argv[2],argv[3],OLD_ORDERING);
 
         // Loading mesh for distributed sources
-        Mesh mesh_sources;
-        mesh_sources.load(argv[4]);
+        Mesh mesh_sources(argv[4]);
 
         // Assembling Matrix from discretization.
-        SurfSourceMat ssm(geo,mesh_sources,gauss_order);
+        const Matrix& ssm = SurfSourceMat(geo,mesh_sources);
         ssm.save(argv[5]); // if outfile is specified
     }
 
@@ -191,24 +191,24 @@ int main(int argc, char** argv)
         }
 
         // Loading surfaces from geometry file.
-        Geometry geo(argv[2],argv[3],OLD_ORDERING);
+        const Geometry geo(argv[2],argv[3],OLD_ORDERING);
 
         // Loading Matrix of dipoles.
-        Matrix dipoles(argv[4]);
+        const Matrix dipoles(argv[4]);
         if (dipoles.ncol()!=6) {
             std::cerr << "Dipoles File Format Error" << std::endl;
             exit(1);
         }
 
-        bool adapt_rhs = true;
-
         // Choosing between adaptive integration or not for the RHS
+
+        unsigned integration_levels = 10;
         if (option(argc,argv,{"-DipSourceMatNoAdapt", "-DSMNA", "-dsmna"},
                     {"geometry file", "conductivity file", "dipoles file", "output file"})) {
-            adapt_rhs = false;
+            integration_levels = 0;
         }
 
-        const Matrix& dsm = DipSourceMat(geo,dipoles);
+        const Matrix& dsm = DipSourceMat(geo,dipoles,AdaptiveIntegrator(3,integration_levels,0.001));
         // Saving RHS Matrix for dipolar case.
         dsm.save(argv[5]);
     }
@@ -221,11 +221,11 @@ int main(int argc, char** argv)
                      {"geometry file", "conductivity file", "electrodes positions file", "output file"}) ) {
 
         // Loading surfaces from geometry file.
-        Geometry geo(argv[2],argv[3],OLD_ORDERING);
+        const Geometry geo(argv[2],argv[3],OLD_ORDERING);
 
-        Sensors electrodes(argv[4], geo); // special parameter for EIT electrodes: the interface
+        const Sensors electrodes(argv[4], geo); // special parameter for EIT electrodes: the interface
         electrodes.info(); // <- just to test that function on the code coverage
-        EITSourceMat EITsource(geo, electrodes, gauss_order);
+        const Matrix& EITsource = EITSourceMat(geo,electrodes);
         EITsource.save(argv[5]);
     }
 
@@ -238,14 +238,14 @@ int main(int argc, char** argv)
                      {"geometry file", "conductivity file", "electrodes positions file", "output file"}) ) {
 
         // Loading surfaces from geometry file.
-        Geometry geo(argv[2],argv[3],OLD_ORDERING);
+        const Geometry geo(argv[2],argv[3],OLD_ORDERING);
 
         // read the file containing the positions of the EEG patches
-        Sensors electrodes(argv[4]);
+        const Sensors electrodes(argv[4]);
 
         // Assembling Matrix from discretization.
         // Head2EEG is the linear application which maps x |----> v
-        Head2EEGMat mat(geo, electrodes);
+        const SparseMatrix& mat = Head2EEGMat(geo,electrodes);
         // Saving Head2EEG Matrix.
         mat.save(argv[5]);
     }
@@ -261,11 +261,11 @@ int main(int argc, char** argv)
 
         // Load surfaces from geometry file.
 
-        Geometry geo(argv[2],argv[3],OLD_ORDERING);
+        const Geometry geo(argv[2],argv[3],OLD_ORDERING);
 
         // Read the file containing the positions of the EEG patches
 
-        Sensors electrodes(argv[4]);
+        const Sensors electrodes(argv[4]);
 
         // Find the mesh of the ECoG electrodes
 
@@ -282,7 +282,7 @@ int main(int argc, char** argv)
         // Assemble matrix from discretization:
         // Head2ECoG is the linear application which maps x |----> v
 
-        Head2ECoGMat mat(geo,electrodes,ECoG_layer);
+        const SparseMatrix& mat = Head2ECoGMat(geo,electrodes,ECoG_layer);
         mat.save(argv[(old_cmd_line) ? 5 : 6]);
     }
 
@@ -295,13 +295,13 @@ int main(int argc, char** argv)
                      {"geometry file", "conductivity file", "squids file", "output file"}) ) {
 
         // Loading surfaces from geometry file.
-        Geometry geo(argv[2],argv[3],OLD_ORDERING);
+        const Geometry geo(argv[2],argv[3],OLD_ORDERING);
 
         // Load positions and orientations of sensors.
-        Sensors sensors(argv[4]);
+        const Sensors sensors(argv[4]);
 
         // Assembling Matrix from discretization.
-        Head2MEGMat mat(geo, sensors);
+        const Matrix& mat = Head2MEGMat(geo,sensors);
         // Saving Head2MEG Matrix.
         mat.save(argv[5]); // if outfile is specified
     }
@@ -314,13 +314,12 @@ int main(int argc, char** argv)
                      {"'mesh sources' file", "squids file", "output file"}) ) {
 
         // Loading mesh for distributed sources.
-        Mesh mesh_sources;
-        mesh_sources.load(argv[2]);
+        const Mesh mesh_sources(argv[2]);
         // Load positions and orientations of sensors.
-        Sensors sensors(argv[3]);
+        const Sensors sensors(argv[3]);
 
         // Assembling Matrix from discretization.
-        SurfSource2MEGMat mat(mesh_sources, sensors);
+        const Matrix& mat = SurfSource2MEGMat(mesh_sources,sensors);
         // Saving SurfSource2MEG Matrix.
         mat.save(argv[4]);
     }
@@ -336,12 +335,12 @@ int main(int argc, char** argv)
                      {"dipoles file", "squids file", "output file"}) ) {
 
         // Loading dipoles.
-        Matrix dipoles(argv[2]);
+        const Matrix dipoles(argv[2]);
 
         // Load positions and orientations of sensors.
-        Sensors sensors(argv[3]);
+        const Sensors sensors(argv[3]);
 
-        DipSource2MEGMat mat( dipoles, sensors );
+        const Matrix& mat = DipSource2MEGMat(dipoles,sensors);
         mat.save(argv[4]);
     }
 
@@ -354,9 +353,9 @@ int main(int argc, char** argv)
                      {"geometry file", "conductivity file", "point positions file", "output file"}) ) {
 
         // Loading surfaces from geometry file
-        Geometry geo(argv[2],argv[3],OLD_ORDERING);
-        Matrix points(argv[4]);
-        Surf2VolMat mat(geo, points);
+        const Geometry geo(argv[2],argv[3],OLD_ORDERING);
+        const Matrix points(argv[4]);
+        const Matrix& mat = Surf2VolMat(geo,points);
         // Saving SurfToVol Matrix.
         mat.save(argv[5]);
     }
@@ -374,11 +373,11 @@ int main(int argc, char** argv)
             std::cout << "Dipoles are considered to be in \"" << domain_name << "\" domain." << std::endl;
         }
         // Loading surfaces from geometry file
-        Geometry geo(argv[2],argv[3],OLD_ORDERING);
+        const Geometry geo(argv[2],argv[3],OLD_ORDERING);
         // Loading dipoles.
-        Matrix dipoles(argv[4]);
-        Matrix points(argv[5]);
-        DipSource2InternalPotMat mat(geo, dipoles, points, domain_name);
+        const Matrix dipoles(argv[4]);
+        const Matrix points(argv[5]);
+        const Matrix& mat = DipSource2InternalPotMat(geo,dipoles,points,domain_name);
         mat.save(argv[6]);
     }
     else {

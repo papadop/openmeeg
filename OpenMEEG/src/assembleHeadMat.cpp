@@ -117,7 +117,7 @@ namespace OpenMEEG {
         };
 
         template <typename TYPE,typename Selector>
-        TYPE HeadMatrix(const Geometry& geo,const unsigned gauss_order,const Selector& disableBlock) {
+        TYPE HeadMatrix(const Geometry& geo,const AdaptiveIntegrator& integrator,const Selector& disableBlock) {
 
             TYPE symmatrix(geo.nb_parameters()-geo.nb_current_barrier_triangles());
             HeadMatrixBlocks<TYPE>::init(symmatrix);
@@ -140,10 +140,10 @@ namespace OpenMEEG {
                 const double coeffs[3] = { SCondCoeff, NCondCoeff, DCondCoeff };
 
                 if (&mesh1==&mesh2) {
-                    HeadMatrixBlocks<DiagonalBlock<>> operators(DiagonalBlock<>(mesh1,gauss_order));
+                    HeadMatrixBlocks<DiagonalBlock> operators(DiagonalBlock(mesh1,integrator));
                     operators.set_blocks(coeffs,symmatrix);
                 } else {
-                    HeadMatrixBlocks<NonDiagonalBlock<>> operators(NonDiagonalBlock<>(mesh1,mesh2,gauss_order));
+                    HeadMatrixBlocks<NonDiagonalBlock> operators(NonDiagonalBlock(mesh1,mesh2,integrator));
                     operators.set_blocks(coeffs,symmatrix);
                 }
             }
@@ -169,15 +169,14 @@ namespace OpenMEEG {
         return cond_coeffs;
     }
 
-    HeadMat::HeadMat(const Geometry& geo,const unsigned gauss_order) {
-        SymMatrix& symmatrix = *this;
-        symmatrix = Details::HeadMatrix<SymMatrix>(geo,gauss_order,Details::AllBlocks());
+    SymMatrix HeadMat(const Geometry& geo,const AdaptiveIntegrator& integrator) {
+        return Details::HeadMatrix<SymMatrix>(geo,integrator,Details::AllBlocks());
     }
 
-    Matrix HeadMatrix(const Geometry& geo,const Interface& Cortex,const unsigned gauss_order,const unsigned extension=0) {
+    Matrix HeadMatrix(const Geometry& geo,const Interface& Cortex,const AdaptiveIntegrator& integrator,const unsigned extension=0) {
 
         const Mesh& cortex = Cortex.oriented_meshes().front().mesh();
-        const SymMatrix& symmatrix = Details::HeadMatrix<SymMatrix>(geo,gauss_order,Details::AllButBlock(cortex));
+        const SymMatrix& symmatrix = Details::HeadMatrix<SymMatrix>(geo,integrator,Details::AllButBlock(cortex));
 
         // Copy symmatrix into the returned matrix except for the lines related to the cortex
         // (vertices [i_vb_c, i_ve_c] and triangles [i_tb_c, i_te_c]).
@@ -199,14 +198,14 @@ namespace OpenMEEG {
         return matrix;
     }
 
-    CorticalMat::CorticalMat(const Geometry& geo,const Head2EEGMat& M,const std::string& domain_name,
-                             const unsigned gauss_order,const double alpha,const double beta,const std::string& filename)
+    Matrix CorticalMat(const Geometry& geo,const SparseMatrix& M,const std::string& domain_name,
+                       const double alpha,const double beta,const std::string& filename,const AdaptiveIntegrator& integrator)
     {
-        Matrix& mat = *this;
-
-        // Following the article: M. Clerc, J. Kybic "Cortical mapping by Laplace–Cauchy transmission using a boundary element method".
+        // Following the article: M. Clerc, J. Kybic "Cortical mapping by Laplace–Cauchy transmission using
+        // a boundary element method".
         // Assumptions:
-        // - domain_name: the domain containing the sources is an innermost domain (defined as the interior of only one interface (called Cortex))
+        // - domain_name: the domain containing the sources is an innermost domain (defined as the interior of
+        //   only one interface (called Cortex))
         // - Cortex interface is composed of one mesh only (no shared vertices).
 
         const Domain& SourceDomain = geo.domain(domain_name);
@@ -222,7 +221,7 @@ namespace OpenMEEG {
         Matrix P;
         std::fstream f(filename.c_str());
         if (!f) {
-            const Matrix& mat = HeadMatrix(geo,Cortex,gauss_order);
+            const Matrix& mat = HeadMatrix(geo,Cortex,integrator);
 
             //  Construct P: the null-space projector.
             //  P is a projector: P^2 = P and mat*P*X = 0
@@ -277,16 +276,15 @@ namespace OpenMEEG {
         // X = P * { P'*(MM + a*RR)*P }¡(-1) * P'*M'm
         // X = P * Z¡(-1) * P' * M'm
 
-        Matrix rhs = P.transpose()*M.transpose();
-        mat = P*Z.pinverse()*rhs;
+        const Matrix& rhs = P.transpose()*M.transpose();
+        return P*Z.pinverse()*rhs;
     }
 
-    CorticalMat2::CorticalMat2(const Geometry& geo,const Head2EEGMat& M,const std::string& domain_name,
-                               const unsigned gauss_order,const double gamma,const std::string &filename)
+    Matrix CorticalMat2(const Geometry& geo,const SparseMatrix& M,const std::string& domain_name,
+                        const double gamma,const std::string &filename,const AdaptiveIntegrator& integrator)
     {
-        Matrix& mat = *this;
-
-        // Re-writting of the optimization problem in M. Clerc, J. Kybic "Cortical mapping by Laplace–Cauchy transmission using a boundary element method".
+        // Re-writting of the optimization problem in M. Clerc, J. Kybic "Cortical mapping by Laplace–Cauchy
+        // transmission using a boundary element method".
         // with a Lagrangian formulation as in see http://www.math.uh.edu/~rohop/fall_06/Chapter3.pdf eq3.3
         // find argmin(norm(gradient(X)) under constraints: 
         // H*X = 0 and M*X = m
@@ -300,7 +298,8 @@ namespace OpenMEEG {
         //      K
         // we want a submatrix of the inverse of K (using block-wise inversion, (TODO maybe iterative solution better ?)).
         // Assumptions:
-        // - domain_name: the domain containing the sources is an innermost domain (defined as the interior of only one interface (called Cortex)
+        // - domain_name: the domain containing the sources is an innermost domain (defined as the interior of only one
+        //   interface (called Cortex)
         // - Cortex interface is composed of one mesh only (no shared vertices)
 
         const Domain& SourceDomain = geo.domain(domain_name);
@@ -314,7 +313,7 @@ namespace OpenMEEG {
         std::fstream f(filename.c_str());
         Matrix H;
         if (!f) {
-            H = HeadMatrix(geo,Cortex,gauss_order,M.nlin());
+            H = HeadMatrix(geo,Cortex,integrator,M.nlin());
             if (filename.length()!=0) {
                 std::cout << "Saving matrix H (" << filename << ")." << std::endl;
                 H.save(filename);
@@ -352,10 +351,10 @@ namespace OpenMEEG {
         std::cout << "gamma = " << gamma << std::endl;
 
         G.invert();
-        mat = (G*H.transpose()*(H*G*H.transpose()).inverse()).submat(0,Nc,Nl,M.nlin());
+        return (G*H.transpose()*(H*G*H.transpose()).inverse()).submat(0,Nc,Nl,M.nlin());
     }
 
-    Surf2VolMat::Surf2VolMat(const Geometry& geo,const Matrix& points) {
+    Matrix Surf2VolMat(const Geometry& geo,const Matrix& points) {
 
         // Find the points per domain and generate the indices for the m_points
         // What happens if a point is on the boundary of a domain ? TODO
@@ -377,8 +376,7 @@ namespace OpenMEEG {
 
         const unsigned size = index; // total number of inside points
 
-        Matrix& mat = *this;
-        mat = Matrix(size,(geo.nb_parameters()-geo.nb_current_barrier_triangles()));
+        Matrix mat(size,geo.nb_parameters()-geo.nb_current_barrier_triangles());
         mat.set(0.0);
 
         for (const auto& [domainptr,pts] : m_points) {
@@ -392,5 +390,7 @@ namespace OpenMEEG {
                         block.S(coeff/domainptr->conductivity(),pts,mat);
                 }
         }
+
+        return mat;
     }
 }

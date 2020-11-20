@@ -69,11 +69,9 @@ getHelp(const char* argv[]) {
 Vector
 VR(const Geometry& geo,const Matrix& points,const SymMatrix& HeadMatInv,const Matrix& rhsEIT) {
 
-    Surf2VolMat matdx(geo, points);
+    const Matrix& matdx = Surf2VolMat(geo,points);
 
-    Matrix EEGGainMatrix;
-    EEGGainMatrix.set(0.0);  // Not useful ?
-    EEGGainMatrix = matdx*HeadMatInv(0,matdx.ncol()-1,0,HeadMatInv.ncol()-1);
+    const Matrix& EEGGainMatrix = matdx*HeadMatInv(0,matdx.ncol()-1,0,HeadMatInv.ncol()-1);
 
     return (EEGGainMatrix*rhsEIT).getcol(0);
 }
@@ -157,7 +155,7 @@ main(const int argc,const char* argv[]) {
     injection(1,0) = -dirac;
 
     Sensors electrodes(electrodes_positions,geo);
-    EITSourceMat EITsource(geo,electrodes,gauss_order);
+    const Matrix& EITsource = EITSourceMat(geo,electrodes);
     const Matrix& rhsEIT = EITsource*injection;
 
     // Surf2Vol

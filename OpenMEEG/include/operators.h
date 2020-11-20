@@ -88,13 +88,10 @@ namespace OpenMEEG {
         }
     }
 
-    //  Replace 0 by 10 if you want the old ADAPT_LHS behaviour.
- 
-    template <unsigned AdaptiveLevels=0>
     class BlocksBase {
     public:
 
-        BlocksBase(const unsigned order): integrator(order,AdaptiveLevels,0.005) { }
+        BlocksBase(const AdaptiveIntegrator& intg): integrator(intg) { }
 
         void message(const char* op_name,const Mesh& mesh) const {
             if (verbose)
@@ -190,10 +187,9 @@ namespace OpenMEEG {
         bool                     verbose = true;
     };
 
-    template <unsigned AdaptiveLevels=0>
-    class DiagonalBlock: public BlocksBase<AdaptiveLevels> {
+    class DiagonalBlock: public BlocksBase {
 
-        typedef BlocksBase<AdaptiveLevels>  base;
+        typedef BlocksBase base;
 
         class SymBloc: public SymMatrix {
 
@@ -213,7 +209,7 @@ namespace OpenMEEG {
         
     public:
 
-        DiagonalBlock(const Mesh& m,const unsigned order): base(order),mesh(m) { }
+        DiagonalBlock(const Mesh& m,const AdaptiveIntegrator& intg): base(intg),mesh(m) { }
 
         template <typename T>
         void set_S_block(const double& coeff,T& matrix) {
@@ -363,10 +359,9 @@ namespace OpenMEEG {
         const Mesh& mesh;
     };
 
-    template <unsigned AdaptiveLevels=0>
-    class NonDiagonalBlock: public BlocksBase<AdaptiveLevels>  {
+    class NonDiagonalBlock: public BlocksBase  {
 
-        typedef BlocksBase<AdaptiveLevels> base;
+        typedef BlocksBase base;
 
         class Bloc: public Matrix {
 
@@ -392,7 +387,7 @@ namespace OpenMEEG {
         //  - The gauss order parameter (for adaptive integration).
         //  - A verbosity parameters (for printing the action on the terminal).
 
-        NonDiagonalBlock(const Mesh& m1,const Mesh& m2,const unsigned order): base(order),mesh1(m1),mesh2(m2) { }
+        NonDiagonalBlock(const Mesh& m1,const Mesh& m2,const AdaptiveIntegrator& intg): base(intg),mesh1(m1),mesh2(m2) { }
 
         template <typename T>
         void set_S_block(const double& coeff,T& matrix) {
