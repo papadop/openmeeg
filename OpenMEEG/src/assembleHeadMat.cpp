@@ -140,10 +140,10 @@ namespace OpenMEEG {
                 const double coeffs[3] = { SCondCoeff, NCondCoeff, DCondCoeff };
 
                 if (&mesh1==&mesh2) {
-                    HeadMatrixBlocks<DiagonalBlock> operators(DiagonalBlock(mesh1,gauss_order));
+                    HeadMatrixBlocks<DiagonalBlock<>> operators(DiagonalBlock<>(mesh1,gauss_order));
                     operators.set_blocks(coeffs,symmatrix);
                 } else {
-                    HeadMatrixBlocks<NonDiagonalBlock> operators(NonDiagonalBlock(mesh1,mesh2,gauss_order));
+                    HeadMatrixBlocks<NonDiagonalBlock<>> operators(NonDiagonalBlock<>(mesh1,mesh2,gauss_order));
                     operators.set_blocks(coeffs,symmatrix);
                 }
             }

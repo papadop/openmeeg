@@ -53,7 +53,7 @@ knowledge of the CeCILL-B license and that you accept its terms.
 
 using namespace OpenMEEG;
 
-unsigned gauss_order = 3;
+constexpr unsigned gauss_order = 3;
 
 void getHelp(char** argv);
 
@@ -208,7 +208,7 @@ int main(int argc, char** argv)
             adapt_rhs = false;
         }
 
-        DipSourceMat dsm(geo, dipoles, gauss_order, adapt_rhs, domain_name);
+        const Matrix& dsm = DipSourceMat(geo,dipoles);
         // Saving RHS Matrix for dipolar case.
         dsm.save(argv[5]);
     }

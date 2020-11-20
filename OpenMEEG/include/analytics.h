@@ -196,18 +196,6 @@ namespace OpenMEEG {
         const Vect3     U3;
     };
 
-    class OPENMEEG_EXPORT analyticDipPot {
-    public:
-
-        analyticDipPot(const Dipole& dip): dipole(dip) { }
-
-        double f(const Vect3& r) const { return dipole.potential(r); }
-
-    private:
-
-        const Dipole& dipole;
-    };
-
     class OPENMEEG_EXPORT analyticDipPotDer {
     public:
 

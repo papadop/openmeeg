@@ -58,37 +58,11 @@ knowledge of the CeCILL-B license and that you accept its terms.
 
 namespace OpenMEEG {
 
-    // TODO: Use overloading and remove the internal suffix.
-
     void operatorFerguson(const Vect3&,const Mesh&,Matrix&,const unsigned&,const double&);
-    void operatorDipolePotDer(const Dipole&,const Mesh&,Vector&,const double&,const unsigned,const bool);
-    void operatorDipolePot(const Dipole&,const Mesh&,Vector&,const double&,const unsigned,const bool);
+    void operatorDipolePotDer(const Dipole&,const Mesh&,Vector&,const double&,const AdaptiveIntegrator&);
+    void operatorDipolePot(const Dipole&,const Mesh&,Vector&,const double&,const AdaptiveIntegrator&);
 
     namespace Details {
-        // #define ADAPT_LHS
-
-        // NOT USED !!! Proof of concept
-        template <template <typename,typename> class Integrator>
-        void operatorDipolePot(const Dipole& dipole,const Mesh& m,Vector& rhs,const double& coeff,const unsigned gauss_order) {
-            analyticDipPot anaDP(dipole);
-
-            Integrator<double,analyticDipPot> gauss(gauss_order,0.001);
-
-            #pragma omp parallel for
-            #if defined NO_OPENMP || defined OPENMP_RANGEFOR
-            for (const auto& triangle : m.triangles()) {
-            #elif defined OPENMP_ITERATOR
-            for (Triangles::const_iterator tit=m.triangles().begin();tit<m.triangles().end();++tit) {
-                const Triangle& triangle = *tit;
-            #else
-            for (int i=0;i<m.triangles().size();++i) {
-                const Triangle& triangle = *(m.triangles().begin()+i);
-            #endif
-                const double d = gauss->integrate(anaDP,triangle);
-                #pragma omp critical
-                rhs(triangle.index()) += d*coeff;
-            }
-        }
 
         inline Vect3 operatorFerguson(const Vect3& x,const Vertex& V,const Mesh& m) {
             Vect3 result;
@@ -103,22 +77,24 @@ namespace OpenMEEG {
                 // A, B are the two opposite vertices to V (triangle A, B, V)
                 const Vertex& A = edge.vertex(0);
                 const Vertex& B = edge.vertex(1);
-                const Vect3 AB = (A-B)/(2*T.area());
+                const Vect3& AB = (A-B)/(2*T.area());
                 
-                analyticS analyS(V,A,B);
-                const double opS = analyS.f(x);
+                const analyticS analyS(V,A,B);
 
-                result += (AB*opS);
+                result += AB*analyS.f(x);
             }
 
             return result;
         }
     }
 
+    //  Replace 0 by 10 if you want the old ADAPT_LHS behaviour.
+ 
+    template <unsigned AdaptiveLevels=0>
     class BlocksBase {
     public:
 
-        BlocksBase(const unsigned order): gauss_order(order) { }
+        BlocksBase(const unsigned order): integrator(order,AdaptiveLevels,0.005) { }
 
         void message(const char* op_name,const Mesh& mesh) const {
             if (verbose)
@@ -131,15 +107,6 @@ namespace OpenMEEG {
         }
 
     protected:
-
-        double S(const analyticS& analyS,const Triangle& triangle) const {
-        #ifdef ADAPT_LHS
-            AdaptiveIntegrator<double,analyticS> gauss(gauss_order,0.005);
-        #else
-            STATIC_OMP Integrator<double,analyticS> gauss(gauss_order);
-        #endif
-            return gauss.integrate(analyS,triangle);
-        }
 
         template <typename T>
         void D(const Triangles& triangles1,const Triangles& triangles2,const double& coeff,T& mat) const {
@@ -209,26 +176,24 @@ namespace OpenMEEG {
             //this version of operatorD add in the Matrix the contribution of T2 on T1
             // for all the P1 functions it gets involved
             // consider varying order of quadrature with the distance between T1 and T2
-            analyticD3 analyD(T2);
-
-        #ifdef ADAPT_LHS
-            AdaptiveIntegrator<Vect3,analyticD3> gauss(gauss_order,0.005);
-        #else
-            STATIC_OMP Integrator<Vect3, analyticD3> gauss(gauss_order);
-        #endif
-            const Vect3 total = gauss.integrate(analyD,T1);
+            const analyticD3 analyD(T2);
+            const auto& Dfunc = [&analyD](const Vect3& r) { return analyD.f(r); };
+            const Vect3 total = integrator.integrate<Vect3>(Dfunc,T1);
 
             for (unsigned i=0; i<3; ++i)
                 mat(T1.index(),T2.vertex(i).index()) += total(i)*coeff;
         }
 
-        const unsigned gauss_order;
-        bool           verbose = true;
+    protected:
+
+        const AdaptiveIntegrator integrator;
+        bool                     verbose = true;
     };
 
-    class DiagonalBlock: public BlocksBase {
+    template <unsigned AdaptiveLevels=0>
+    class DiagonalBlock: public BlocksBase<AdaptiveLevels> {
 
-        typedef BlocksBase  base;
+        typedef BlocksBase<AdaptiveLevels>  base;
 
         class SymBloc: public SymMatrix {
 
@@ -291,6 +256,8 @@ namespace OpenMEEG {
             for (Triangles::const_iterator tit1=triangles.begin(); tit1!=triangles.end(); ++tit1,++pb) {
                 const Triangle& triangle1 = *tit1;
                 const analyticS analyS(triangle1);
+                const auto& Sfunc = [&analyS](const Vect3& r) { return analyS.f(r); };
+
                 #pragma omp parallel for
                 #if defined NO_OPENMP || defined OPENMP_ITERATOR
                 for (Triangles::const_iterator tit2=tit1; tit2!=triangles.end(); ++tit2) {
@@ -299,7 +266,7 @@ namespace OpenMEEG {
                 for (int i2=tit1-triangles.begin(); i2<triangles.size(); ++i2) {
                     const Triangle& triangle2 = *(triangles.begin()+i2);
                 #endif
-                    matrix(triangle1.index(),triangle2.index()) = base::S(analyS,triangle2)*coeff;
+                    matrix(triangle1.index(),triangle2.index()) = base::integrator.template integrate<double>(Sfunc,triangle2)*coeff;
                 }
             }
         }
@@ -363,6 +330,7 @@ namespace OpenMEEG {
               double Scoeff = 0.0;
     };
 
+    template <unsigned AdaptiveLevels=0>
     class PartialBlock {
     public:
 
@@ -395,9 +363,10 @@ namespace OpenMEEG {
         const Mesh& mesh;
     };
 
-    class NonDiagonalBlock: public BlocksBase  {
+    template <unsigned AdaptiveLevels=0>
+    class NonDiagonalBlock: public BlocksBase<AdaptiveLevels>  {
 
-        typedef BlocksBase base;
+        typedef BlocksBase<AdaptiveLevels> base;
 
         class Bloc: public Matrix {
 
@@ -464,7 +433,10 @@ namespace OpenMEEG {
             // using ADAPT_LHS with tolerance at 0.000005 (for S) drops this at 6.e-6 (but increase the computation time).
 
             for (const auto& triangle1 : mesh1.triangles()) {
+
                 const analyticS analyS(triangle1);
+                const auto& Sfunc = [&analyS](const Vect3& r) { return analyS.f(r); };
+
                 const Triangles& m2_triangles = mesh2.triangles();
                 #pragma omp parallel for
                 #if defined NO_OPENMP || defined OPENMP_RANGEFOR
@@ -476,7 +448,7 @@ namespace OpenMEEG {
                 for (int i2=0;i2<m2_triangles.size();++i2) {
                     const Triangle& triangle2 = *(m2_triangles.begin()+i2);
                 #endif
-                    matrix(triangle1.index(),triangle2.index()) = base::S(analyS,triangle2)*coeff;
+                    matrix(triangle1.index(),triangle2.index()) = base::integrator.template integrate<double>(Sfunc,triangle2)*coeff;
                 }
                 ++pb;
             }

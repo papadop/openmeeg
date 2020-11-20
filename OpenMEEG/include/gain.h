@@ -109,10 +109,9 @@ namespace OpenMEEG {
 
         GainEEGadjoint(const Geometry& geo,const Matrix& dipoles,const SymMatrix& HeadMat,const SparseMatrix& Head2EEGMat): Matrix(Head2EEGMat.nlin(),dipoles.nlin()) {
             const Matrix& Hinv = linsolve(HeadMat,Head2EEGMat);
-            const int gauss_order = 3;
             ProgressBar pb(ncol());
             for (unsigned i=0; i<ncol(); ++i,++pb)
-                setcol(i,Hinv*DipSourceMat(geo,dipoles.submat(i,1,0,dipoles.ncol()),gauss_order,true,"").getcol(0)); // TODO ugly
+                setcol(i,Hinv*DipSourceMat(geo,dipoles.submat(i,1,0,dipoles.ncol())).getcol(0)); // TODO ugly
         }
     };
 
@@ -125,10 +124,9 @@ namespace OpenMEEG {
             Matrix(Head2MEGMat.nlin(),dipoles.nlin()) 
         {
             const Matrix& Hinv = linsolve(HeadMat,Head2MEGMat);
-            const int gauss_order = 3;
             ProgressBar pb(ncol());
             for (unsigned i=0; i<ncol(); ++i,++pb)
-                setcol(i,Hinv*DipSourceMat(geo,dipoles.submat(i,1,0,dipoles.ncol()),gauss_order,true,"").getcol(0)+Source2MEGMat.getcol(i)); // TODO ugly
+                setcol(i,Hinv*DipSourceMat(geo,dipoles.submat(i,1,0,dipoles.ncol())).getcol(0)+Source2MEGMat.getcol(i)); // TODO ugly
         }
     };
 
@@ -145,10 +143,9 @@ namespace OpenMEEG {
 
             const Matrix& Hinv = linsolve(HeadMat,RHS);
 
-            const unsigned gauss_order = 3;
             ProgressBar pb(dipoles.nlin());
             for (unsigned i=0; i<dipoles.nlin(); ++i,++pb) {
-                const Vector& dsm = DipSourceMat(geo,dipoles.submat(i,1,0,dipoles.ncol()),gauss_order,true,"").getcol(0); // TODO ugly
+                const Vector& dsm = DipSourceMat(geo,dipoles.submat(i,1,0,dipoles.ncol())).getcol(0); // TODO ugly
                 EEGleadfield.setcol(i,Hinv.submat(0,Head2EEGMat.nlin(),0,HeadMat.nlin())*dsm);
                 MEGleadfield.setcol(i,Hinv.submat(Head2EEGMat.nlin(),Head2MEGMat.nlin(),0,HeadMat.nlin())*dsm+Source2MEGMat.getcol(i));
             }

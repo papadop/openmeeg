@@ -63,10 +63,7 @@ namespace OpenMEEG {
         }
     }
 
-    void operatorDipolePotDer(const Dipole& dipole,const Mesh& m,Vector& rhs,const double& coeff,const unsigned gauss_order,const bool adapt_rhs) {
-        Integrator<Vect3,analyticDipPotDer>* gauss = (adapt_rhs) ? new AdaptiveIntegrator<Vect3,analyticDipPotDer>(gauss_order,0.001) :
-                                                                   new Integrator<Vect3,analyticDipPotDer>(gauss_order);
-
+    void operatorDipolePotDer(const Dipole& dipole,const Mesh& m,Vector& rhs,const double& coeff,const AdaptiveIntegrator& integrator) {
         #pragma omp parallel for
         #if defined NO_OPENMP || defined OPENMP_RANGEFOR
         for (const auto& triangle : m.triangles()) {
@@ -78,22 +75,19 @@ namespace OpenMEEG {
             const Triangle& triangle = *(m.triangles().begin()+i);
         #endif
             const analyticDipPotDer anaDPD(dipole,triangle);
+            const auto dipder = [&](const Vect3& r) { return anaDPD.f(r); };
 
-            const Vect3& v = gauss->integrate(anaDPD,triangle);
+            const Vect3& v = integrator.integrate<Vect3>(dipder,triangle);
             #pragma omp critical
             {
                 for (unsigned i=0; i<3; ++i)
                     rhs(triangle.vertex(i).index()) += v(i)*coeff;
             }
         }
-        delete gauss;
     }
 
-    void operatorDipolePot(const Dipole& dipole,const Mesh& m,Vector& rhs,const double& coeff,const unsigned gauss_order,const bool adapt_rhs) {
-        const analyticDipPot anaDP(dipole);
-
-        AdaptiveIntegrator<double,analyticDipPot> gauss(gauss_order,0.001);
-
+    void operatorDipolePot(const Dipole& dipole,const Mesh& m,Vector& rhs,const double& coeff,const AdaptiveIntegrator& integrator) {
+        const auto& dippot = [&dipole](const Vect3& r) { return dipole.potential(r); };
         #pragma omp parallel for
         #if defined NO_OPENMP || defined OPENMP_RANGEFOR
         for (const auto& triangle : m.triangles()) {
@@ -104,7 +98,7 @@ namespace OpenMEEG {
         for (int i=0;i<m.triangles().size();++i) {
             const Triangle& triangle = *(m.triangles().begin()+i);
         #endif
-            const double d = gauss.integrate(anaDP,triangle);
+            const double d = integrator.integrate<double>(dippot,triangle);
             rhs(triangle.index()) += d*coeff;
         }
     }

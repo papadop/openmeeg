@@ -46,6 +46,7 @@ knowledge of the CeCILL-B license and that you accept its terms.
 #include <symmatrix.h>
 #include <geometry.h>
 #include <sensors.h>
+#include <integrator.h>
 
 #include <sparse_matrix.h>
 
@@ -63,12 +64,8 @@ namespace OpenMEEG {
         virtual ~SurfSourceMat() { };
     };
 
-    class OPENMEEG_EXPORT DipSourceMat: public Matrix {
-    public:
-        DipSourceMat(const Geometry& geo,const Matrix& dipoles,const unsigned gauss_order=3,
-                     const bool adapt_rhs=true,const std::string& domain_name="");
-        virtual ~DipSourceMat() { };
-    };
+    OPENMEEG_EXPORT Matrix
+    DipSourceMat(const Geometry& geo,const Matrix& dipoles,const AdaptiveIntegrator& integrator=AdaptiveIntegrator(3,10,0.001),const std::string& domain_name="");
 
     class OPENMEEG_EXPORT EITSourceMat: public Matrix {
     public:

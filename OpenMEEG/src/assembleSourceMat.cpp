@@ -92,14 +92,14 @@ namespace OpenMEEG {
         }
     }
 
-    DipSourceMat::DipSourceMat(const Geometry& geo,const Matrix& dipoles,const unsigned gauss_order,
-                               const bool adapt_rhs,const std::string& domain_name)
+    Matrix
+    DipSourceMat(const Geometry& geo,const Matrix& dipoles,const AdaptiveIntegrator& integrator,
+                 const std::string& domain_name)
     {
         const size_t size      = geo.nb_parameters()-geo.nb_current_barrier_triangles();
         const size_t n_dipoles = dipoles.nlin();
 
-        Matrix& rhs = *this;
-        rhs = Matrix(size,n_dipoles);
+        Matrix rhs(size,n_dipoles);
         rhs.set(0.0);
 
         ProgressBar pb(n_dipoles);
@@ -120,17 +120,18 @@ namespace OpenMEEG {
                         //  Treat the mesh.
                         const double coeffD = factorD*oriented_mesh.orientation();
                         const Mesh&  mesh   = oriented_mesh.mesh();
-                        operatorDipolePotDer(dipole,mesh,rhs_col,coeffD,gauss_order,adapt_rhs);
+                        operatorDipolePotDer(dipole,mesh,rhs_col,coeffD,integrator);
 
                         if (!oriented_mesh.mesh().current_barrier()) {
                             const double coeff = -coeffD/cond;;
-                            operatorDipolePot(dipole,mesh,rhs_col,coeff,gauss_order,adapt_rhs);
+                            operatorDipolePot(dipole,mesh,rhs_col,coeff,integrator);
                         }
                     }
                 }
                 rhs.setcol(s,rhs_col);
             }
         }
+        return rhs;
     }
 
     EITSourceMat::EITSourceMat(const Geometry& geo,const Sensors& electrodes,const unsigned gauss_order) {
@@ -206,10 +207,9 @@ namespace OpenMEEG {
             const Domain& domain = (domain_name=="") ? geo.domain(dipole.position()) : geo.domain(domain_name);
             const double  coeff  = K/domain.conductivity();
 
-            const analyticDipPot anaDP(dipole);
             for (unsigned iPTS=0; iPTS<pts.size(); ++iPTS)
                 if (points_domain[iPTS]==&domain)
-                    mat(iPTS,iDIP) += coeff*anaDP.f(pts[iPTS]);
+                    mat(iPTS,iDIP) += coeff*dipole.potential(pts[iPTS]);
         }
     }
 }
